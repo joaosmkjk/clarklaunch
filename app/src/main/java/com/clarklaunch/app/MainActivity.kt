@@ -246,6 +246,9 @@ private fun ClarkLaunchHome(
     onWallpaperOpacityChanged: (Float) -> Unit
 ) {
     val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { }
     var search by remember { mutableStateOf("") }
     var showAllApps by remember { mutableStateOf(false) }
     var favorites by remember { mutableStateOf(initialFavorites) }
@@ -365,6 +368,9 @@ private fun ClarkLaunchHome(
                                 modifier = Modifier.weight(1f).clickable {
                                     val app = pendingFocusApp
                                     if (app != null) {
+                                        if (Build.VERSION.SDK_INT >= 33) {
+                                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        }
                                         onStartFocusSession(app.packageName, app.label, minutes)
                                         pendingFocusApp = null
                                         onLaunchApp(app.packageName)
