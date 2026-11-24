@@ -1223,7 +1223,7 @@ private fun ClarkLaunchHome(
 
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "CLARKLAUNCH  ·  0.9.0",
+                    "CLARKLAUNCH  ·  0.10.0",
                     color = Color(0xFFB5AAB0),
                     fontSize = 9.sp,
                     letterSpacing = 1.5.sp,
