@@ -108,6 +108,7 @@ private data class LauncherBackup(
     val focusApps: Set<String>,
     val hiddenApps: Set<String>,
     val appFolders: Map<String, String>,
+    val folderNames: List<String>,
     val wallpaperOpacity: Float
 )
 
@@ -152,7 +153,9 @@ class MainActivity : ComponentActivity() {
                     initialFocusApps = getSavedFocusApps(),
                     initialHiddenApps = getSavedHiddenApps(),
                     initialAppFolders = getSavedAppFolders(),
+                    initialFolderNames = getSavedFolderNames(),
                     onAppFoldersChanged = ::saveAppFolders,
+                    onFolderNamesChanged = ::saveFolderNames,
                     onHiddenAppsChanged = ::saveHiddenApps,
                     onFocusAppsChanged = ::saveFocusApps,
                     onStartFocusSession = ::startFocusSession,
@@ -254,6 +257,19 @@ class MainActivity : ComponentActivity() {
         getSharedPreferences("clarklaunch", MODE_PRIVATE).edit().putString("app_folders", encoded).apply()
     }
 
+    private fun getSavedFolderNames(): List<String> {
+        val defaults = listOf("Estudo", "Trabalho", "Pessoal")
+        val saved = getSharedPreferences("clarklaunch", MODE_PRIVATE)
+            .getStringSet("folder_names", emptySet()).orEmpty()
+        return (defaults + saved).distinct()
+    }
+
+    private fun saveFolderNames(names: List<String>) {
+        val custom = names.filterNot { it in listOf("Estudo", "Trabalho", "Pessoal") }.toSet()
+        getSharedPreferences("clarklaunch", MODE_PRIVATE).edit()
+            .putStringSet("folder_names", custom).apply()
+    }
+
     private fun getSavedHiddenApps(): Set<String> =
         getSharedPreferences("clarklaunch", MODE_PRIVATE)
             .getStringSet("hidden_apps", emptySet())?.toSet() ?: emptySet()
@@ -280,6 +296,7 @@ class MainActivity : ComponentActivity() {
             .put("focusApps", JSONArray(getSavedFocusApps().toList()))
             .put("hiddenApps", JSONArray(getSavedHiddenApps().toList()))
             .put("appFolders", folders)
+            .put("folderNames", JSONArray(getSavedFolderNames()))
             .put("wallpaperOpacity", prefs.getFloat("wallpaper_opacity", 0.34f).toDouble())
         contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(backup.toString(2)) }
             ?: throw IllegalStateException("Não foi possível gravar o arquivo.")
@@ -296,12 +313,22 @@ class MainActivity : ComponentActivity() {
             return buildSet { for (i in 0 until array.length()) array.optString(i).takeIf { it.isNotBlank() }?.let(::add) }
         }
         val folderObject = json.optJSONObject("appFolders") ?: JSONObject()
+        val rawFolderNames = json.optJSONArray("folderNames")
+        val restoredFolderNames = buildList {
+            addAll(listOf("Estudo", "Trabalho", "Pessoal"))
+            if (rawFolderNames != null) {
+                for (i in 0 until rawFolderNames.length()) {
+                    val name = rawFolderNames.optString(i).trim()
+                    if (name.length in 1..24 && '|' !in name && '=' !in name && none { it.equals(name, ignoreCase = true) }) add(name)
+                }
+            }
+        }
         val folders = buildMap {
             val keys = folderObject.keys()
             while (keys.hasNext()) {
                 val key = keys.next()
                 val value = folderObject.optString(key)
-                if (key.isNotBlank() && value in setOf("Estudo", "Trabalho", "Pessoal")) put(key, value)
+                if (key.isNotBlank() && value in restoredFolderNames) put(key, value)
             }
         }
         val opacity = json.optDouble("wallpaperOpacity", 0.34).toFloat().coerceIn(0.12f, 0.60f)
@@ -311,6 +338,7 @@ class MainActivity : ComponentActivity() {
             focusApps = readSet("focusApps"),
             hiddenApps = readSet("hiddenApps"),
             appFolders = folders,
+            folderNames = restoredFolderNames,
             wallpaperOpacity = opacity
         )
         getSharedPreferences("clarklaunch", MODE_PRIVATE).edit()
@@ -319,6 +347,7 @@ class MainActivity : ComponentActivity() {
             .putStringSet("focus_apps", snapshot.focusApps)
             .putStringSet("hidden_apps", snapshot.hiddenApps)
             .putString("app_folders", snapshot.appFolders.entries.joinToString("|") { "${it.key}=${it.value}" })
+            .putStringSet("folder_names", snapshot.folderNames.filterNot { it in listOf("Estudo", "Trabalho", "Pessoal") }.toSet())
             .putFloat("wallpaper_opacity", snapshot.wallpaperOpacity)
             .apply()
         return snapshot
@@ -373,7 +402,9 @@ private fun ClarkLaunchHome(
     initialFocusApps: Set<String>,
     initialHiddenApps: Set<String>,
     initialAppFolders: Map<String, String>,
+    initialFolderNames: List<String>,
     onAppFoldersChanged: (Map<String, String>) -> Unit,
+    onFolderNamesChanged: (List<String>) -> Unit,
     onHiddenAppsChanged: (Set<String>) -> Unit,
     onFocusAppsChanged: (Set<String>) -> Unit,
     onStartFocusSession: (String, String, Int) -> Unit,
@@ -404,6 +435,9 @@ private fun ClarkLaunchHome(
     var focusApps by remember { mutableStateOf(initialFocusApps) }
     var hiddenApps by remember { mutableStateOf(initialHiddenApps) }
     var appFolders by remember { mutableStateOf(initialAppFolders) }
+    var folderNames by remember { mutableStateOf(initialFolderNames) }
+    var newFolderName by remember { mutableStateOf("") }
+    var showFolderManager by remember { mutableStateOf(false) }
     var selectedFolderApp by remember { mutableStateOf<LaunchableApp?>(null) }
     var activeFolder by remember { mutableStateOf("Todos") }
     var showHiddenManager by remember { mutableStateOf(false) }
@@ -456,6 +490,7 @@ private fun ClarkLaunchHome(
             focusApps = restored.focusApps
             hiddenApps = restored.hiddenApps
             appFolders = restored.appFolders
+            folderNames = restored.folderNames
             wallpaperOpacity = restored.wallpaperOpacity
             "Configurações restauradas. O PIN e o papel de parede atual foram preservados."
         } catch (error: Exception) {
@@ -529,7 +564,7 @@ private fun ClarkLaunchHome(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Escolha em qual pasta este aplicativo deve aparecer.", color = SoftInk, fontSize = 13.sp)
-                    listOf("Sem pasta", "Estudo", "Trabalho", "Pessoal").forEach { folder ->
+                    (listOf("Sem pasta") + folderNames).forEach { folder ->
                         TextButton(onClick = {
                             appFolders = if (folder == "Sem pasta") appFolders - app.packageName
                                 else appFolders + (app.packageName to folder)
@@ -542,6 +577,59 @@ private fun ClarkLaunchHome(
                 }
             },
             confirmButton = { TextButton(onClick = { selectedFolderApp = null }) { Text("Fechar", color = SoftInk) } },
+            containerColor = White
+        )
+    }
+
+    if (showFolderManager) {
+        AlertDialog(
+            onDismissRequest = { showFolderManager = false; newFolderName = "" },
+            title = { Text("Suas pastas", color = Ink) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Crie categorias com seus próprios nomes. As pastas padrão continuam disponíveis.", color = SoftInk, fontSize = 12.sp)
+                    BasicTextField(
+                        value = newFolderName,
+                        onValueChange = { value ->
+                            if (value.length <= 24 && '|' !in value && '=' !in value && '\\n' !in value) newFolderName = value
+                        },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = Ink),
+                        decorationBox = { inner ->
+                            Box(Modifier.fillMaxWidth().background(Canvas, RoundedCornerShape(10.dp)).padding(12.dp)) {
+                                if (newFolderName.isEmpty()) Text("Nome da nova pasta", color = SoftInk, fontSize = 13.sp)
+                                inner()
+                            }
+                        }
+                    )
+                    Text("Até 24 caracteres. Evite nomes repetidos.", color = SoftInk, fontSize = 10.sp)
+                    folderNames.filterNot { it in listOf("Estudo", "Trabalho", "Pessoal") }.forEach { folder ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(folder, color = Ink, modifier = Modifier.weight(1f), fontSize = 13.sp)
+                            TextButton(onClick = {
+                                appFolders = appFolders.filterValues { it != folder }
+                                onAppFoldersChanged(appFolders)
+                                folderNames = folderNames - folder
+                                onFolderNamesChanged(folderNames)
+                                if (activeFolder == folder) activeFolder = "Todos"
+                            }) { Text("Excluir", color = Rose, fontSize = 11.sp) }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val name = newFolderName.trim()
+                    if (name.isNotEmpty() && folderNames.none { it.equals(name, ignoreCase = true) } && '|' !in name && '=' !in name) {
+                        folderNames = folderNames + name
+                        onFolderNamesChanged(folderNames)
+                        activeFolder = name
+                        newFolderName = ""
+                        showFolderManager = false
+                    }
+                }) { Text("Criar pasta", color = Blue) }
+            },
+            dismissButton = { TextButton(onClick = { showFolderManager = false; newFolderName = "" }) { Text("Fechar", color = SoftInk) } },
             containerColor = White
         )
     }
@@ -1053,7 +1141,7 @@ private fun ClarkLaunchHome(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(7.dp)
                     ) {
-                        listOf("Todos", "Estudo", "Trabalho", "Pessoal", "Sem pasta").forEach { folder ->
+                        (listOf("Todos") + folderNames + "Sem pasta").forEach { folder ->
                             TextButton(
                                 onClick = { activeFolder = folder },
                                 modifier = Modifier.background(if (activeFolder == folder) BlueWash else White, RoundedCornerShape(14.dp))
@@ -1061,6 +1149,9 @@ private fun ClarkLaunchHome(
                                 Text(folder, color = if (activeFolder == folder) Blue else SoftInk, fontSize = 11.sp)
                             }
                         }
+                    }
+                    TextButton(onClick = { showFolderManager = true }) {
+                        Text("+ Gerenciar pastas", color = Rose, fontSize = 12.sp)
                     }
                     Spacer(Modifier.height(8.dp))
                     LazyColumn(
