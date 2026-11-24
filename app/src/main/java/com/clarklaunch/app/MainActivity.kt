@@ -591,7 +591,7 @@ private fun ClarkLaunchHome(
                     BasicTextField(
                         value = newFolderName,
                         onValueChange = { value ->
-                            if (value.length <= 24 && '|' !in value && '=' !in value && '\\n' !in value) newFolderName = value
+                            if (value.length <= 24 && '|' !in value && '=' !in value) newFolderName = value
                         },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyMedium.copy(color = Ink),
