@@ -3,8 +3,7 @@ package com.clarklaunch.app
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Canvas as AndroidCanvas
-import android.graphics.drawable.Drawable
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -34,14 +33,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +61,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import kotlinx.coroutines.delay
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private val Canvas = Color(0xFFF8F9FB)
 private val White = Color(0xFFFFFFFF)
@@ -75,6 +83,7 @@ private data class LaunchableApp(
 )
 
 class MainActivity : ComponentActivity() {
+    private var installedApps by mutableStateOf<List<LaunchableApp>>(emptyList())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,7 +108,7 @@ class MainActivity : ComponentActivity() {
                 )
             ) {
                 ClarkLaunchHome(
-                    apps = loadLaunchableApps(),
+                    apps = installedApps,
                     initialFavorites = getSavedFavorites(),
                     initialWallpaper = getSavedWallpaper(),
                     onLaunchApp = ::launchApp,
@@ -108,6 +117,11 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        installedApps = loadLaunchableApps()
     }
 
     private fun loadLaunchableApps(): List<LaunchableApp> {
@@ -129,12 +143,11 @@ class MainActivity : ComponentActivity() {
                 )
             }
             .distinctBy { it.packageName }
-            .sortedBy { it.label.lowercase() }
+            .sortedBy { it.label.lowercase(Locale.getDefault()) }
     }
 
     private fun launchApp(packageName: String) {
         val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         startActivity(intent)
     }
 
@@ -170,6 +183,22 @@ private fun ClarkLaunchHome(
     var showAllApps by remember { mutableStateOf(false) }
     var favorites by remember { mutableStateOf(initialFavorites) }
     var wallpaperUri by remember { mutableStateOf(initialWallpaper?.let(Uri::parse)) }
+    var wallpaperOpacity by remember { mutableStateOf(0.34f) }
+    var showSettings by remember { mutableStateOf(false) }
+    var favoriteLimitMessage by remember { mutableStateOf(false) }
+    var currentTime by remember { mutableStateOf(LocalDateTime.now()) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            currentTime = LocalDateTime.now()
+            delay(30_000)
+        }
+    }
+
+    val timeText = currentTime.format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
+    val dateText = currentTime.format(
+        DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM", Locale("pt", "BR"))
+    ).replaceFirstChar { it.uppercase(Locale("pt", "BR")) }
 
     val wallpaperPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -181,7 +210,7 @@ private fun ClarkLaunchHome(
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             } catch (_: SecurityException) {
-                // Some document providers do not offer persistable permissions.
+                // Provider did not grant persistable access; retain the selected URI for this session.
             }
             wallpaperUri = uri
             onWallpaperChanged(uri.toString())
@@ -191,8 +220,17 @@ private fun ClarkLaunchHome(
     val wallpaperBitmap = remember(wallpaperUri) {
         wallpaperUri?.let { uri ->
             try {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 context.contentResolver.openInputStream(uri)?.use {
-                    android.graphics.BitmapFactory.decodeStream(it)?.asImageBitmap()
+                    BitmapFactory.decodeStream(it, null, bounds)
+                }
+                var sample = 1
+                while (bounds.outWidth / sample > 1600 || bounds.outHeight / sample > 1600) {
+                    sample *= 2
+                }
+                val options = BitmapFactory.Options().apply { inSampleSize = sample }
+                context.contentResolver.openInputStream(uri)?.use {
+                    BitmapFactory.decodeStream(it, null, options)?.asImageBitmap()
                 }
             } catch (_: Exception) {
                 null
@@ -203,6 +241,48 @@ private fun ClarkLaunchHome(
     val filteredApps = apps.filter { it.label.contains(search, ignoreCase = true) }
     val favoriteApps = apps.filter { it.packageName in favorites }.take(5)
 
+    if (showSettings) {
+        AlertDialog(
+            onDismissRequest = { showSettings = false },
+            title = { Text("Ajustes do ClarkLaunch", color = Ink) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Intensidade do papel de parede", color = Ink, fontWeight = FontWeight.Medium)
+                    Slider(
+                        value = wallpaperOpacity,
+                        onValueChange = { wallpaperOpacity = it },
+                        valueRange = 0.12f..0.60f
+                    )
+                    Text(
+                        "Ajuste entre um fundo discreto e uma imagem mais presente.",
+                        color = SoftInk,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        "Dock: até 5 aplicativos favoritos.",
+                        color = Blue,
+                        fontSize = 12.sp
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSettings = false }) {
+                    Text("Concluir", color = Blue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    wallpaperUri = null
+                    onWallpaperChanged("")
+                    showSettings = false
+                }) {
+                    Text("Remover wallpaper", color = Rose)
+                }
+            },
+            containerColor = White
+        )
+    }
+
     Surface(modifier = Modifier.fillMaxSize(), color = Canvas) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (wallpaperBitmap != null) {
@@ -210,19 +290,19 @@ private fun ClarkLaunchHome(
                     bitmap = wallpaperBitmap,
                     contentDescription = "Papel de parede",
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().alpha(0.20f)
+                    modifier = Modifier.fillMaxSize().alpha(wallpaperOpacity)
                 )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Canvas.copy(alpha = 0.76f))
+                        .background(Canvas.copy(alpha = 1f - wallpaperOpacity * 0.42f))
                 )
             }
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 25.dp, vertical = 25.dp)
+                    .padding(horizontal = 25.dp, vertical = 20.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -231,59 +311,49 @@ private fun ClarkLaunchHome(
                 ) {
                     Column {
                         Text(
-                            text = "C L A R K",
+                            "C L A R K",
                             color = Ink,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 2.8.sp
                         )
                         Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "a quieter kind of home",
-                            color = SoftInk,
-                            fontSize = 10.sp,
-                            letterSpacing = 0.5.sp
-                        )
+                        Text("a quieter kind of home", color = SoftInk, fontSize = 10.sp)
                     }
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .background(BlueWash, CircleShape)
-                            .clickable { wallpaperPicker.launch(arrayOf("image/*")) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Image,
-                            contentDescription = "Escolher papel de parede",
-                            tint = Blue
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(BlueWash, CircleShape)
+                                .clickable { wallpaperPicker.launch(arrayOf("image/*")) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Outlined.Image, contentDescription = "Escolher wallpaper", tint = Blue)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(RoseWash, CircleShape)
+                                .clickable { showSettings = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Outlined.Settings, contentDescription = "Configurações", tint = Rose)
+                        }
                     }
                 }
 
-                Spacer(Modifier.height(45.dp))
+                Spacer(Modifier.height(30.dp))
 
-                Text(
-                    text = "Leveza em",
-                    color = Ink,
-                    fontSize = 35.sp,
-                    fontWeight = FontWeight.Light,
-                    letterSpacing = (-1).sp
-                )
-                Text(
-                    text = "cada detalhe.",
-                    color = Rose,
-                    fontSize = 35.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = (-1).sp
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = "Seu mundo, em harmonia.",
-                    color = SoftInk,
-                    fontSize = 13.sp
-                )
+                Text(timeText, color = Ink, fontSize = 58.sp, fontWeight = FontWeight.Light, letterSpacing = (-2).sp)
+                Text(dateText, color = SoftInk, fontSize = 12.sp)
+                Spacer(Modifier.height(24.dp))
 
-                Spacer(Modifier.height(26.dp))
+                Text("Leveza em", color = Ink, fontSize = 31.sp, fontWeight = FontWeight.Light, letterSpacing = (-1).sp)
+                Text("cada detalhe.", color = Rose, fontSize = 31.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1).sp)
+                Spacer(Modifier.height(8.dp))
+                Text("Seu mundo, em harmonia.", color = SoftInk, fontSize = 13.sp)
+
+                Spacer(Modifier.height(22.dp))
 
                 Row(
                     modifier = Modifier
@@ -305,16 +375,14 @@ private fun ClarkLaunchHome(
                         textStyle = MaterialTheme.typography.bodyMedium.copy(color = Ink),
                         decorationBox = { innerTextField ->
                             Box {
-                                if (search.isEmpty()) {
-                                    Text("Buscar um aplicativo", color = SoftInk, fontSize = 13.sp)
-                                }
+                                if (search.isEmpty()) Text("Buscar um aplicativo", color = SoftInk, fontSize = 13.sp)
                                 innerTextField()
                             }
                         }
                     )
                 }
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(20.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -322,14 +390,14 @@ private fun ClarkLaunchHome(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (showAllApps) "BIBLIOTECA" else "SEUS FAVORITOS",
+                        if (showAllApps) "BIBLIOTECA" else "SEUS FAVORITOS",
                         color = SoftInk,
                         fontSize = 10.sp,
                         letterSpacing = 2.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = if (showAllApps) "VOLTAR" else "VER TODOS",
+                        if (showAllApps) "VOLTAR" else "VER TODOS",
                         color = Blue,
                         fontSize = 10.sp,
                         letterSpacing = 1.sp,
@@ -340,7 +408,7 @@ private fun ClarkLaunchHome(
                     )
                 }
 
-                Spacer(Modifier.height(13.dp))
+                Spacer(Modifier.height(12.dp))
 
                 if (!showAllApps) {
                     if (favoriteApps.isEmpty()) {
@@ -349,79 +417,63 @@ private fun ClarkLaunchHome(
                                 .fillMaxWidth()
                                 .background(White.copy(alpha = 0.94f), RoundedCornerShape(20.dp))
                                 .clickable { showAllApps = true }
-                                .padding(19.dp)
+                                .padding(18.dp)
                         ) {
-                            Text(
-                                "Monte sua dock",
-                                color = Ink,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Text("Sua dock começa aqui", color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(5.dp))
-                            Text(
-                                "Abra todos os aplicativos e toque na estrela para fixar seus favoritos.",
-                                color = SoftInk,
-                                fontSize = 12.sp
-                            )
+                            Text("Abra a biblioteca e toque na estrela para fixar até cinco favoritos.", color = SoftInk, fontSize = 12.sp)
                         }
                     } else {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(White.copy(alpha = 0.94f), RoundedCornerShape(22.dp))
-                                .padding(vertical = 16.dp, horizontal = 8.dp),
+                                .padding(vertical = 15.dp, horizontal = 7.dp),
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            favoriteApps.forEachIndexed { index, app ->
+                            favoriteApps.forEach { app ->
                                 Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable { onLaunchApp(app.packageName) },
+                                    modifier = Modifier.weight(1f).clickable { onLaunchApp(app.packageName) },
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Image(
                                         bitmap = app.icon.asImageBitmap(),
                                         contentDescription = app.label,
-                                        modifier = Modifier.size(38.dp)
+                                        modifier = Modifier.size(39.dp)
                                     )
-                                    Spacer(Modifier.height(7.dp))
-                                    Text(
-                                        text = app.label,
-                                        color = Ink,
-                                        fontSize = 9.sp,
-                                        maxLines = 1
-                                    )
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(app.label, color = Ink, fontSize = 9.sp, maxLines = 1)
                                 }
                             }
                         }
                     }
 
-                    Spacer(Modifier.height(18.dp))
+                    if (favoriteLimitMessage) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("A dock já tem cinco aplicativos. Remova um favorito para adicionar outro.", color = Rose, fontSize = 11.sp)
+                    }
+
+                    Spacer(Modifier.height(15.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(BlueWash.copy(alpha = 0.8f), RoundedCornerShape(18.dp))
+                            .background(BlueWash.copy(alpha = 0.92f), RoundedCornerShape(18.dp))
                             .clickable { wallpaperPicker.launch(arrayOf("image/*")) }
-                            .padding(16.dp),
+                            .padding(15.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(Icons.Outlined.Image, contentDescription = null, tint = Blue)
                         Spacer(Modifier.size(12.dp))
                         Column {
-                            Text("Papel de parede", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Escolha uma imagem da sua galeria", color = SoftInk, fontSize = 11.sp)
+                            Text("Seu cenário", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Escolha uma imagem da galeria", color = SoftInk, fontSize = 11.sp)
                         }
                     }
-                    Spacer(Modifier.height(18.dp))
-                    Box(Modifier.fillMaxWidth().height(1.dp).background(Line))
                     Spacer(Modifier.height(14.dp))
-                    Text(
-                        "UM LUGAR PARA RESPIRAR",
-                        color = Color(0xFFB5AAB0),
-                        fontSize = 9.sp,
-                        letterSpacing = 1.8.sp
-                    )
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(Line))
+                    Spacer(Modifier.height(12.dp))
+                    Text("UM LUGAR PARA RESPIRAR", color = Color(0xFFB5AAB0), fontSize = 9.sp, letterSpacing = 1.8.sp)
                 } else {
                     LazyColumn(
                         modifier = Modifier.weight(1f),
@@ -437,41 +489,39 @@ private fun ClarkLaunchHome(
                                     .padding(horizontal = 15.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Image(
-                                    bitmap = app.icon.asImageBitmap(),
-                                    contentDescription = app.label,
-                                    modifier = Modifier.size(38.dp)
-                                )
+                                Image(bitmap = app.icon.asImageBitmap(), contentDescription = app.label, modifier = Modifier.size(38.dp))
                                 Spacer(Modifier.size(12.dp))
-                                Text(
-                                    text = app.label,
-                                    color = Ink,
-                                    fontSize = 14.sp,
-                                    modifier = Modifier.weight(1f)
-                                )
+                                Text(app.label, color = Ink, fontSize = 14.sp, modifier = Modifier.weight(1f))
                                 Icon(
                                     imageVector = if (app.packageName in favorites) Icons.Outlined.Star else Icons.Outlined.StarBorder,
                                     contentDescription = "Fixar favorito",
                                     tint = if (app.packageName in favorites) Blue else SoftInk,
-                                    modifier = Modifier
-                                        .size(22.dp)
-                                        .clickable {
-                                            favorites = if (app.packageName in favorites) {
-                                                favorites - app.packageName
-                                            } else {
-                                                (favorites + app.packageName).toSet()
-                                            }
-                                            onFavoritesChanged(favorites)
+                                    modifier = Modifier.size(24.dp).clickable {
+                                        favoriteLimitMessage = false
+                                        favorites = if (app.packageName in favorites) {
+                                            favorites - app.packageName
+                                        } else if (favorites.size < 5) {
+                                            favorites + app.packageName
+                                        } else {
+                                            favoriteLimitMessage = true
+                                            favorites
                                         }
+                                        onFavoritesChanged(favorites)
+                                    }
                                 )
+                            }
+                        }
+                        if (filteredApps.isEmpty()) {
+                            item {
+                                Text("Nenhum aplicativo encontrado.", color = SoftInk, modifier = Modifier.padding(16.dp))
                             }
                         }
                     }
                 }
 
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "CLARKLAUNCH  ·  0.2.0",
+                    "CLARKLAUNCH  ·  0.3.0",
                     color = Color(0xFFB5AAB0),
                     fontSize = 9.sp,
                     letterSpacing = 1.5.sp,
