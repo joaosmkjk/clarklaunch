@@ -1,6 +1,7 @@
 package com.clarklaunch.app
 
 import android.Manifest
+import android.app.role.RoleManager
 import android.app.AppOpsManager
 import android.app.usage.UsageStatsManager
 import android.content.Context
@@ -164,7 +165,8 @@ class MainActivity : ComponentActivity() {
                     onExportBackup = ::exportBackup,
                     onImportBackup = ::importBackup,
                     onReadUsageStats = ::readTodayUsageStats,
-                    onOpenUsageAccess = { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+                    onOpenUsageAccess = { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },
+                    onRequestDefaultLauncher = ::requestDefaultLauncher
                 )
             }
         }
@@ -322,6 +324,17 @@ class MainActivity : ComponentActivity() {
         return snapshot
     }
 
+    private fun requestDefaultLauncher() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(RoleManager::class.java)
+            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_HOME) && !roleManager.isRoleHeld(RoleManager.ROLE_HOME)) {
+                startActivity(roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME))
+            }
+        } else {
+            startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+        }
+    }
+
     private fun readTodayUsageStats(): List<Pair<String, Long>>? {
         val appOps = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
         @Suppress("DEPRECATION")
@@ -373,7 +386,8 @@ private fun ClarkLaunchHome(
     onExportBackup: (Uri) -> Unit,
     onImportBackup: (Uri) -> LauncherBackup,
     onReadUsageStats: () -> List<Pair<String, Long>>?,
-    onOpenUsageAccess: () -> Unit
+    onOpenUsageAccess: () -> Unit,
+    onRequestDefaultLauncher: () -> Unit
 ) {
     val context = LocalContext.current
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -745,6 +759,11 @@ private fun ClarkLaunchHome(
             title = { Text("Ajustes do ClarkLaunch", color = Ink) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Tela inicial padrão", color = Ink, fontWeight = FontWeight.Medium)
+                    Text("Defina o ClarkLaunch como aplicativo de início do Android. A confirmação é feita pelo próprio sistema.", color = SoftInk, fontSize = 11.sp)
+                    TextButton(onClick = onRequestDefaultLauncher) {
+                        Text("Definir como launcher padrão", color = Blue)
+                    }
                     Text("Intensidade do papel de parede", color = Ink, fontWeight = FontWeight.Medium)
                     Slider(
                         value = wallpaperOpacity,
