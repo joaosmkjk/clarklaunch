@@ -29,10 +29,9 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,10 +43,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val Wine = Color(0xFF842D49)
-private val Background = Color(0xFF100D10)
-private val Panel = Color(0xFF1D171C)
-private val Muted = Color(0xFFAA9DA4)
+private val Canvas = Color(0xFFF8F7F8)
+private val White = Color(0xFFFFFFFF)
+private val Ink = Color(0xFF28242A)
+private val SoftInk = Color(0xFF77717A)
+private val Rose = Color(0xFFB85E7A)
+private val RoseWash = Color(0xFFF5E8ED)
+private val Line = Color(0xFFECE7EA)
 
 private data class LaunchableApp(
     val label: String,
@@ -59,15 +61,22 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility =
+            android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or
+                android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        window.statusBarColor = android.graphics.Color.rgb(248, 247, 248)
+        window.navigationBarColor = android.graphics.Color.rgb(248, 247, 248)
+
         setContent {
             MaterialTheme(
-                colorScheme = darkColorScheme(
-                    primary = Wine,
-                    background = Background,
-                    surface = Panel,
-                    onPrimary = Color.White,
-                    onBackground = Color(0xFFF5EDF1),
-                    onSurface = Color(0xFFF5EDF1)
+                colorScheme = lightColorScheme(
+                    primary = Rose,
+                    background = Canvas,
+                    surface = White,
+                    onPrimary = White,
+                    onBackground = Ink,
+                    onSurface = Ink
                 )
             ) {
                 ClarkLaunchHome(
@@ -109,18 +118,13 @@ private fun ClarkLaunchHome(
     var search by remember { mutableStateOf("") }
     var showAllApps by remember { mutableStateOf(false) }
 
-    val filteredApps = apps.filter {
-        it.label.contains(search, ignoreCase = true)
-    }
+    val filteredApps = apps.filter { it.label.contains(search, ignoreCase = true) }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Background
-    ) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Canvas) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 22.dp, vertical = 28.dp)
+                .padding(horizontal = 25.dp, vertical = 25.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -129,69 +133,72 @@ private fun ClarkLaunchHome(
             ) {
                 Column {
                     Text(
-                        text = "CLARK",
-                        color = Color.White,
-                        fontSize = 13.sp,
+                        text = "C L A R K",
+                        color = Ink,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 4.sp
+                        letterSpacing = 2.8.sp
                     )
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "SYSTEM / HOME",
-                        color = Muted,
+                        text = "a quieter kind of home",
+                        color = SoftInk,
                         fontSize = 10.sp,
-                        letterSpacing = 2.sp
+                        letterSpacing = 0.5.sp
                     )
                 }
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .background(Wine.copy(alpha = 0.22f), CircleShape),
+                        .background(White, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Apps,
-                        contentDescription = "ClarkLaunch",
-                        tint = Color(0xFFE5A9BE)
+                        contentDescription = "Aplicativos",
+                        tint = Rose
                     )
                 }
             }
 
-            Spacer(Modifier.height(48.dp))
+            Spacer(Modifier.height(54.dp))
 
             Text(
-                text = "Seu espaço.",
-                color = Color.White,
-                fontSize = 34.sp,
-                fontWeight = FontWeight.Light
+                text = "Leveza em",
+                color = Ink,
+                fontSize = 35.sp,
+                fontWeight = FontWeight.Light,
+                letterSpacing = (-1).sp
             )
             Text(
-                text = "Suas regras.",
-                color = Color(0xFFE5A9BE),
-                fontSize = 34.sp,
-                fontWeight = FontWeight.SemiBold
+                text = "cada detalhe.",
+                color = Rose,
+                fontSize = 35.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-1).sp
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             Text(
-                text = "Tudo o que você precisa, sem excesso.",
-                color = Muted,
+                text = "Seu mundo, em harmonia.",
+                color = SoftInk,
                 fontSize = 13.sp
             )
 
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(30.dp))
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Panel, RoundedCornerShape(16.dp))
-                    .padding(horizontal = 15.dp, vertical = 14.dp),
+                    .background(White, RoundedCornerShape(18.dp))
+                    .padding(horizontal = 16.dp, vertical = 15.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Search,
                     contentDescription = null,
-                    tint = Muted
+                    tint = Rose
                 )
-                Spacer(Modifier.size(10.dp))
+                Spacer(Modifier.size(11.dp))
                 BasicTextField(
                     value = search,
                     onValueChange = {
@@ -200,11 +207,11 @@ private fun ClarkLaunchHome(
                     },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Ink),
                     decorationBox = { innerTextField ->
                         Box {
                             if (search.isEmpty()) {
-                                Text("Buscar aplicativos", color = Muted, fontSize = 14.sp)
+                                Text("Buscar um aplicativo", color = SoftInk, fontSize = 13.sp)
                             }
                             innerTextField()
                         }
@@ -212,7 +219,7 @@ private fun ClarkLaunchHome(
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(28.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -220,15 +227,15 @@ private fun ClarkLaunchHome(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (showAllApps) "APLICATIVOS" else "SEU DISPOSITIVO",
-                    color = Muted,
+                    text = if (showAllApps) "BIBLIOTECA" else "SEU ESPAÇO",
+                    color = SoftInk,
                     fontSize = 10.sp,
                     letterSpacing = 2.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = if (showAllApps) "INÍCIO" else "VER TODOS",
-                    color = Color(0xFFE5A9BE),
+                    text = if (showAllApps) "VOLTAR" else "VER TODOS",
+                    color = Rose,
                     fontSize = 10.sp,
                     letterSpacing = 1.sp,
                     modifier = Modifier.clickable {
@@ -238,29 +245,56 @@ private fun ClarkLaunchHome(
                 )
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(13.dp))
 
             if (!showAllApps) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Panel, RoundedCornerShape(18.dp))
+                        .background(White, RoundedCornerShape(20.dp))
                         .clickable { showAllApps = true }
-                        .padding(18.dp)
+                        .padding(19.dp)
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(RoseWash, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Apps,
+                            contentDescription = null,
+                            tint = Rose
+                        )
+                    }
+                    Spacer(Modifier.height(13.dp))
                     Text(
-                        text = "Biblioteca de aplicativos",
-                        color = Color.White,
-                        fontSize = 16.sp,
+                        text = "Todos os aplicativos",
+                        color = Ink,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(Modifier.height(5.dp))
                     Text(
-                        text = "${apps.size} aplicativos encontrados · Toque para explorar",
-                        color = Muted,
+                        text = "${apps.size} aplicativos disponíveis",
+                        color = SoftInk,
                         fontSize = 12.sp
                     )
                 }
+                Spacer(Modifier.height(14.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(Line)
+                )
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = "UM LUGAR PARA RESPIRAR",
+                    color = Color(0xFFB5AAB0),
+                    fontSize = 9.sp,
+                    letterSpacing = 1.8.sp
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
@@ -271,29 +305,25 @@ private fun ClarkLaunchHome(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Panel, RoundedCornerShape(14.dp))
+                                .background(White, RoundedCornerShape(15.dp))
                                 .clickable { onLaunchApp(app.packageName) }
-                                .padding(horizontal = 16.dp, vertical = 15.dp),
+                                .padding(horizontal = 15.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(34.dp)
-                                    .background(Wine.copy(alpha = 0.28f), RoundedCornerShape(10.dp)),
+                                    .size(36.dp)
+                                    .background(RoseWash, RoundedCornerShape(12.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = app.label.take(1).uppercase(),
-                                    color = Color(0xFFE5A9BE),
+                                    color = Rose,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                             Spacer(Modifier.size(12.dp))
-                            Text(
-                                text = app.label,
-                                color = Color.White,
-                                fontSize = 14.sp
-                            )
+                            Text(text = app.label, color = Ink, fontSize = 14.sp)
                         }
                     }
                 }
@@ -301,8 +331,8 @@ private fun ClarkLaunchHome(
 
             Spacer(Modifier.height(18.dp))
             Text(
-                text = "CLARKLAUNCH  •  FOUNDATION 0.1.0",
-                color = Color(0xFF74666D),
+                text = "CLARKLAUNCH  ·  0.1.0",
+                color = Color(0xFFB5AAB0),
                 fontSize = 9.sp,
                 letterSpacing = 1.5.sp,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
