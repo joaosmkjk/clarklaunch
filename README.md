@@ -2,7 +2,7 @@
 
 Um launcher Android independente, construído com Kotlin e Jetpack Compose.
 
-## Development 0.8.0
+## Development 0.9.0
 
 - Identidade visual clara em branco pérola, rosa suave e azul-gelo.
 - Relógio digital e data em português na tela inicial.
@@ -13,12 +13,14 @@ Um launcher Android independente, construído com Kotlin e Jetpack Compose.
 - Seleção de papel de parede pela galeria.
 - Intensidade do wallpaper persistida entre sessões.
 - Configurações iniciais do launcher.
+- Ação para solicitar ao Android que defina o ClarkLaunch como launcher padrão, usando o seletor oficial de função HOME.
 - App Lock com PIN de 4 a 8 dígitos, hash PBKDF2 com salt aleatório e seleção individual de aplicativos protegidos.
 - Modo Foco: seleção de aplicativos que distraem, sessões de 5, 10 ou 15 minutos e lembrete em segundo plano ao fim da sessão, usando WorkManager.
 - Solicitação de PIN ao abrir apps protegidos pela biblioteca ou pela dock do ClarkLaunch.
 - Atualização da lista de aplicativos ao retornar à tela inicial.
 - Backup e restauração em JSON de favoritos, listas de apps e pastas; o PIN nunca é exportado.
 - Visão local do uso diário dos aplicativos, mediante ativação manual de Acesso ao uso nas configurações do Android.
+- Configuração do ClarkLaunch como tela inicial padrão pelo fluxo oficial do Android; a escolha permanece sob controle do usuário.
 - GitHub Actions para compilar e publicar o APK de debug como artefato.
 
 ## Requisitos
