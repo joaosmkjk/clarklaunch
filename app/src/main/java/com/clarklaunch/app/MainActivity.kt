@@ -7,12 +7,15 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -111,9 +115,11 @@ class MainActivity : ComponentActivity() {
                     apps = installedApps,
                     initialFavorites = getSavedFavorites(),
                     initialWallpaper = getSavedWallpaper(),
+                    initialWallpaperOpacity = getSavedWallpaperOpacity(),
                     onLaunchApp = ::launchApp,
                     onFavoritesChanged = ::saveFavorites,
-                    onWallpaperChanged = ::saveWallpaper
+                    onWallpaperChanged = ::saveWallpaper,
+                    onWallpaperOpacityChanged = ::saveWallpaperOpacity
                 )
             }
         }
@@ -160,6 +166,14 @@ class MainActivity : ComponentActivity() {
             .edit().putStringSet("favorites", favorites).apply()
     }
 
+    private fun getSavedWallpaperOpacity(): Float =
+        getSharedPreferences("clarklaunch", MODE_PRIVATE).getFloat("wallpaper_opacity", 0.34f)
+
+    private fun saveWallpaperOpacity(value: Float) {
+        getSharedPreferences("clarklaunch", MODE_PRIVATE)
+            .edit().putFloat("wallpaper_opacity", value).apply()
+    }
+
     private fun getSavedWallpaper(): String? =
         getSharedPreferences("clarklaunch", MODE_PRIVATE).getString("wallpaper_uri", null)
 
@@ -174,16 +188,18 @@ private fun ClarkLaunchHome(
     apps: List<LaunchableApp>,
     initialFavorites: Set<String>,
     initialWallpaper: String?,
+    initialWallpaperOpacity: Float,
     onLaunchApp: (String) -> Unit,
     onFavoritesChanged: (Set<String>) -> Unit,
-    onWallpaperChanged: (String) -> Unit
+    onWallpaperChanged: (String) -> Unit,
+    onWallpaperOpacityChanged: (Float) -> Unit
 ) {
     val context = LocalContext.current
     var search by remember { mutableStateOf("") }
     var showAllApps by remember { mutableStateOf(false) }
     var favorites by remember { mutableStateOf(initialFavorites) }
     var wallpaperUri by remember { mutableStateOf(initialWallpaper?.let(Uri::parse)) }
-    var wallpaperOpacity by remember { mutableStateOf(0.34f) }
+    var wallpaperOpacity by remember { mutableStateOf(initialWallpaperOpacity) }
     var showSettings by remember { mutableStateOf(false) }
     var favoriteLimitMessage by remember { mutableStateOf(false) }
     var currentTime by remember { mutableStateOf(LocalDateTime.now()) }
@@ -241,6 +257,10 @@ private fun ClarkLaunchHome(
     val filteredApps = apps.filter { it.label.contains(search, ignoreCase = true) }
     val favoriteApps = apps.filter { it.packageName in favorites }.take(5)
 
+    BackHandler(enabled = showAllApps || search.isNotEmpty()) {
+        if (showAllApps) showAllApps = false else search = ""
+    }
+
     if (showSettings) {
         AlertDialog(
             onDismissRequest = { showSettings = false },
@@ -250,7 +270,10 @@ private fun ClarkLaunchHome(
                     Text("Intensidade do papel de parede", color = Ink, fontWeight = FontWeight.Medium)
                     Slider(
                         value = wallpaperOpacity,
-                        onValueChange = { wallpaperOpacity = it },
+                        onValueChange = {
+                            wallpaperOpacity = it
+                            onWallpaperOpacityChanged(it)
+                        },
                         valueRange = 0.12f..0.60f
                     )
                     Text(
@@ -284,7 +307,25 @@ private fun ClarkLaunchHome(
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = Canvas) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        var horizontalDrag by remember { mutableStateOf(0f) }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(showAllApps) {
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { change, dragAmount ->
+                            horizontalDrag += dragAmount
+                            change.consume()
+                        },
+                        onDragEnd = {
+                            if (horizontalDrag < -90f) showAllApps = true
+                            if (horizontalDrag > 90f) showAllApps = false
+                            horizontalDrag = 0f
+                        },
+                        onDragCancel = { horizontalDrag = 0f }
+                    )
+                }
+        ) {
             if (wallpaperBitmap != null) {
                 Image(
                     bitmap = wallpaperBitmap,
@@ -303,6 +344,7 @@ private fun ClarkLaunchHome(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 25.dp, vertical = 20.dp)
+                    .animateContentSize()
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
