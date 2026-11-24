@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Timer
@@ -131,6 +134,8 @@ class MainActivity : ComponentActivity() {
                     initialHasPin = AppLockSecurity.hasPin(this@MainActivity),
                     initialFocusApps = getSavedFocusApps(),
                     initialHiddenApps = getSavedHiddenApps(),
+                    initialAppFolders = getSavedAppFolders(),
+                    onAppFoldersChanged = ::saveAppFolders,
                     onHiddenAppsChanged = ::saveHiddenApps,
                     onFocusAppsChanged = ::saveFocusApps,
                     onStartFocusSession = ::startFocusSession,
@@ -215,6 +220,18 @@ class MainActivity : ComponentActivity() {
         getSharedPreferences("clarklaunch", MODE_PRIVATE)
             .getStringSet("focus_apps", emptySet())?.toSet() ?: emptySet()
 
+    private fun getSavedAppFolders(): Map<String, String> =
+        getSharedPreferences("clarklaunch", MODE_PRIVATE).getString("app_folders", null)
+            ?.split("|")?.mapNotNull { entry ->
+                val parts = entry.split("=", limit = 2)
+                if (parts.size == 2) parts[0] to parts[1] else null
+            }?.toMap() ?: emptyMap()
+
+    private fun saveAppFolders(folders: Map<String, String>) {
+        val encoded = folders.entries.joinToString("|") { "${it.key}=${it.value}" }
+        getSharedPreferences("clarklaunch", MODE_PRIVATE).edit().putString("app_folders", encoded).apply()
+    }
+
     private fun getSavedHiddenApps(): Set<String> =
         getSharedPreferences("clarklaunch", MODE_PRIVATE)
             .getStringSet("hidden_apps", emptySet())?.toSet() ?: emptySet()
@@ -248,6 +265,8 @@ private fun ClarkLaunchHome(
     initialHasPin: Boolean,
     initialFocusApps: Set<String>,
     initialHiddenApps: Set<String>,
+    initialAppFolders: Map<String, String>,
+    onAppFoldersChanged: (Map<String, String>) -> Unit,
     onHiddenAppsChanged: (Set<String>) -> Unit,
     onFocusAppsChanged: (Set<String>) -> Unit,
     onStartFocusSession: (String, String, Int) -> Unit,
@@ -272,6 +291,9 @@ private fun ClarkLaunchHome(
     var lockedApps by remember { mutableStateOf(initialLockedApps) }
     var focusApps by remember { mutableStateOf(initialFocusApps) }
     var hiddenApps by remember { mutableStateOf(initialHiddenApps) }
+    var appFolders by remember { mutableStateOf(initialAppFolders) }
+    var selectedFolderApp by remember { mutableStateOf<LaunchableApp?>(null) }
+    var activeFolder by remember { mutableStateOf("Todos") }
     var showHiddenManager by remember { mutableStateOf(false) }
     var showFocusManager by remember { mutableStateOf(false) }
     var pendingFocusApp by remember { mutableStateOf<LaunchableApp?>(null) }
@@ -338,6 +360,7 @@ private fun ClarkLaunchHome(
 
     val visibleApps = apps.filter { it.packageName !in hiddenApps }
     val filteredApps = visibleApps
+        .filter { activeFolder == "Todos" || (appFolders[it.packageName] ?: "Sem pasta") == activeFolder }
         .filter {
             it.label.contains(search.trim(), ignoreCase = true) ||
                 it.packageName.contains(search.trim(), ignoreCase = true)
@@ -354,6 +377,31 @@ private fun ClarkLaunchHome(
         if (showAllApps) showAllApps = false else search = ""
     }
 
+
+    if (selectedFolderApp != null) {
+        val app = selectedFolderApp!!
+        AlertDialog(
+            onDismissRequest = { selectedFolderApp = null },
+            title = { Text("Organizar ${app.label}", color = Ink) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Escolha em qual pasta este aplicativo deve aparecer.", color = SoftInk, fontSize = 13.sp)
+                    listOf("Sem pasta", "Estudo", "Trabalho", "Pessoal").forEach { folder ->
+                        TextButton(onClick = {
+                            appFolders = if (folder == "Sem pasta") appFolders - app.packageName
+                                else appFolders + (app.packageName to folder)
+                            onAppFoldersChanged(appFolders)
+                            selectedFolderApp = null
+                        }) {
+                            Text(if ((appFolders[app.packageName] ?: "Sem pasta") == folder) "✓  $folder" else folder, color = Blue)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { selectedFolderApp = null }) { Text("Fechar", color = SoftInk) } },
+            containerColor = White
+        )
+    }
 
     if (showHiddenManager) {
         AlertDialog(
@@ -814,6 +862,20 @@ private fun ClarkLaunchHome(
                     Spacer(Modifier.height(12.dp))
                     Text("UM LUGAR PARA RESPIRAR", color = Color(0xFFB5AAB0), fontSize = 9.sp, letterSpacing = 1.8.sp)
                 } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        listOf("Todos", "Estudo", "Trabalho", "Pessoal", "Sem pasta").forEach { folder ->
+                            TextButton(
+                                onClick = { activeFolder = folder },
+                                modifier = Modifier.background(if (activeFolder == folder) BlueWash else White, RoundedCornerShape(14.dp))
+                            ) {
+                                Text(folder, color = if (activeFolder == folder) Blue else SoftInk, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
                     LazyColumn(
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(bottom = 20.dp),
@@ -838,6 +900,12 @@ private fun ClarkLaunchHome(
                                 if (app.packageName in lockedApps) {
                                     Icon(Icons.Outlined.Lock, contentDescription = "Aplicativo protegido", tint = Blue, modifier = Modifier.padding(end = 8.dp).size(18.dp))
                                 }
+                                Icon(
+                                    imageVector = Icons.Outlined.Folder,
+                                    contentDescription = "Organizar em pasta",
+                                    tint = if (app.packageName in appFolders) Blue else SoftInk,
+                                    modifier = Modifier.size(22.dp).clickable { selectedFolderApp = app }.padding(end = 6.dp)
+                                )
                                 Icon(
                                     imageVector = if (app.packageName in favorites) Icons.Outlined.Star else Icons.Outlined.StarBorder,
                                     contentDescription = "Fixar favorito",
