@@ -1,6 +1,8 @@
 package com.clarklaunch.app
 
+import android.Manifest
 import android.content.Intent
+import android.os.Build
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -36,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
@@ -69,6 +72,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.delay
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
+import java.util.concurrent.TimeUnit
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -121,6 +129,9 @@ class MainActivity : ComponentActivity() {
                     initialWallpaperOpacity = getSavedWallpaperOpacity(),
                     initialLockedApps = getSavedLockedApps(),
                     initialHasPin = AppLockSecurity.hasPin(this@MainActivity),
+                    initialFocusApps = getSavedFocusApps(),
+                    onFocusAppsChanged = ::saveFocusApps,
+                    onStartFocusSession = ::startFocusSession,
                     onSetPin = { AppLockSecurity.setPin(this@MainActivity, it) },
                     onLockedAppsChanged = ::saveLockedApps,
                     onLaunchApp = ::launchApp,
@@ -197,6 +208,23 @@ class MainActivity : ComponentActivity() {
         getSharedPreferences("clarklaunch", MODE_PRIVATE)
             .edit().putStringSet("locked_apps", packages).apply()
     }
+
+    private fun getSavedFocusApps(): Set<String> =
+        getSharedPreferences("clarklaunch", MODE_PRIVATE)
+            .getStringSet("focus_apps", emptySet())?.toSet() ?: emptySet()
+
+    private fun saveFocusApps(packages: Set<String>) {
+        getSharedPreferences("clarklaunch", MODE_PRIVATE)
+            .edit().putStringSet("focus_apps", packages).apply()
+    }
+
+    private fun startFocusSession(packageName: String, appLabel: String, minutes: Int) {
+        val request = OneTimeWorkRequestBuilder<FocusReminderWorker>()
+            .setInitialDelay(minutes.toLong(), TimeUnit.MINUTES)
+            .setInputData(workDataOf("app_label" to appLabel, "minutes" to minutes))
+            .build()
+        WorkManager.getInstance(this).enqueueUniqueWork("focus_session_$packageName", ExistingWorkPolicy.REPLACE, request)
+    }
 }
 
 @Composable
@@ -207,6 +235,9 @@ private fun ClarkLaunchHome(
     initialWallpaperOpacity: Float,
     initialLockedApps: Set<String>,
     initialHasPin: Boolean,
+    initialFocusApps: Set<String>,
+    onFocusAppsChanged: (Set<String>) -> Unit,
+    onStartFocusSession: (String, String, Int) -> Unit,
     onSetPin: (String) -> Unit,
     onLockedAppsChanged: (Set<String>) -> Unit,
     onLaunchApp: (String) -> Unit,
@@ -223,6 +254,9 @@ private fun ClarkLaunchHome(
     var showSettings by remember { mutableStateOf(false) }
     var favoriteLimitMessage by remember { mutableStateOf(false) }
     var lockedApps by remember { mutableStateOf(initialLockedApps) }
+    var focusApps by remember { mutableStateOf(initialFocusApps) }
+    var showFocusManager by remember { mutableStateOf(false) }
+    var pendingFocusApp by remember { mutableStateOf<LaunchableApp?>(null) }
     var hasPin by remember { mutableStateOf(initialHasPin) }
     var showLockManager by remember { mutableStateOf(false) }
     var showPinSetup by remember { mutableStateOf(false) }
@@ -289,6 +323,69 @@ private fun ClarkLaunchHome(
 
     BackHandler(enabled = showAllApps || search.isNotEmpty()) {
         if (showAllApps) showAllApps = false else search = ""
+    }
+
+
+    if (showFocusManager) {
+        AlertDialog(
+            onDismissRequest = { showFocusManager = false },
+            title = { Text("Seus aplicativos de distração", color = Ink) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Selecione os aplicativos que você quer usar com limite de tempo. Ao abri-los, poderá iniciar uma sessão de 5, 10 ou 15 minutos.", color = SoftInk, fontSize = 12.sp)
+                    LazyColumn(modifier = Modifier.height(330.dp)) {
+                        items(apps, key = { it.packageName }) { app ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Image(bitmap = app.icon.asImageBitmap(), contentDescription = null, modifier = Modifier.size(28.dp))
+                                Text(app.label, color = Ink, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(start = 9.dp))
+                                Checkbox(checked = app.packageName in focusApps, onCheckedChange = { checked ->
+                                    focusApps = if (checked) focusApps + app.packageName else focusApps - app.packageName
+                                    onFocusAppsChanged(focusApps)
+                                })
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showFocusManager = false }) { Text("Concluir", color = Blue) } },
+            containerColor = White
+        )
+    }
+
+    if (pendingFocusApp != null) {
+        AlertDialog(
+            onDismissRequest = { pendingFocusApp = null },
+            title = { Text(pendingFocusApp?.label ?: "Modo Foco", color = Ink) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Quanto tempo você quer reservar para este aplicativo?", color = SoftInk, fontSize = 14.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(5, 10, 15).forEach { minutes ->
+                            Surface(
+                                modifier = Modifier.weight(1f).clickable {
+                                    val app = pendingFocusApp
+                                    if (app != null) {
+                                        onStartFocusSession(app.packageName, app.label, minutes)
+                                        pendingFocusApp = null
+                                        onLaunchApp(app.packageName)
+                                    }
+                                },
+                                color = BlueWash,
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 14.dp)) {
+                                    Text(minutes.toString(), color = Blue, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("MIN", color = SoftInk, fontSize = 10.sp, letterSpacing = 1.sp)
+                                }
+                            }
+                        }
+                    }
+                    Text("Ao final, você receberá um lembrete para encerrar a sessão. Isso não bloqueia o aplicativo automaticamente.", color = SoftInk, fontSize = 11.sp)
+                }
+            },
+            confirmButton = { TextButton(onClick = { pendingFocusApp = null }) { Text("Agora não", color = Rose) } },
+            containerColor = White
+        )
     }
 
     if (showPinSetup) {
@@ -480,6 +577,10 @@ private fun ClarkLaunchHome(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Box(
+                            modifier = Modifier.size(40.dp).background(BlueWash, CircleShape).clickable { showFocusManager = true },
+                            contentAlignment = Alignment.Center
+                        ) { Icon(Icons.Outlined.Timer, contentDescription = "Modo Foco", tint = Blue) }
+                        Box(
                             modifier = Modifier
                                 .size(40.dp)
                                 .background(BlueWash, CircleShape)
@@ -601,7 +702,7 @@ private fun ClarkLaunchHome(
                         ) {
                             favoriteApps.forEach { app ->
                                 Column(
-                                    modifier = Modifier.weight(1f).clickable { if (app.packageName in lockedApps) pendingLockedPackage = app.packageName else onLaunchApp(app.packageName) },
+                                    modifier = Modifier.weight(1f).clickable { if (app.packageName in lockedApps) pendingLockedPackage = app.packageName else if (app.packageName in focusApps) pendingFocusApp = app else onLaunchApp(app.packageName) },
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Image(
@@ -654,6 +755,7 @@ private fun ClarkLaunchHome(
                                     .background(White.copy(alpha = 0.96f), RoundedCornerShape(15.dp))
                                     .clickable {
                                         if (app.packageName in lockedApps) pendingLockedPackage = app.packageName
+                                        else if (app.packageName in focusApps) pendingFocusApp = app
                                         else onLaunchApp(app.packageName)
                                     }
                                     .padding(horizontal = 15.dp, vertical = 12.dp),
@@ -704,7 +806,7 @@ private fun ClarkLaunchHome(
 
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "CLARKLAUNCH  ·  0.5.0",
+                    "CLARKLAUNCH  ·  0.6.0",
                     color = Color(0xFFB5AAB0),
                     fontSize = 9.sp,
                     letterSpacing = 1.5.sp,
