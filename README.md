@@ -2,14 +2,16 @@
 
 Um launcher Android independente, construído com Kotlin e Jetpack Compose.
 
-## Foundation 0.2.0
+## Foundation 0.3.0
 
-- Identidade visual clara em branco pérola, com detalhes rosa e azul.
-- Ícones reais dos aplicativos instalados.
-- Biblioteca com busca e acesso direto aos aplicativos.
-- Dock de até cinco favoritos, com seleção por estrela e persistência local.
-- Escolha de papel de parede pela galeria, com permissão persistente quando suportada pelo provedor.
-- Registro como opção de aplicativo de início (HOME) do Android.
+- Interface clara em branco pérola, com detalhes rosa e azul-gelo.
+- Relógio digital e data em português na tela inicial.
+- Ícones reais e biblioteca pesquisável de aplicativos instalados.
+- Dock com até cinco favoritos, persistidos localmente.
+- Atualização da lista de aplicativos ao retornar ao launcher.
+- Seleção de papel de parede pela galeria, com persistência de acesso quando suportada.
+- Controle de intensidade visual do wallpaper e opção para removê-lo.
+- Configurações iniciais do launcher.
 - GitHub Actions para compilar e publicar o APK de debug como artefato.
 
 ## Requisitos
