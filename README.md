@@ -2,7 +2,7 @@
 
 Um launcher Android independente, construído com Kotlin e Jetpack Compose.
 
-## Foundation 0.5.0
+## Foundation 0.6.0
 
 - Identidade visual clara em branco pérola, rosa suave e azul-gelo.
 - Relógio digital e data em português na tela inicial.
@@ -14,6 +14,7 @@ Um launcher Android independente, construído com Kotlin e Jetpack Compose.
 - Intensidade do wallpaper persistida entre sessões.
 - Configurações iniciais do launcher.
 - App Lock com PIN de 4 a 8 dígitos, hash PBKDF2 com salt aleatório e seleção individual de aplicativos protegidos.
+- Modo Foco: seleção de aplicativos que distraem, sessões de 5, 10 ou 15 minutos e lembrete em segundo plano ao fim da sessão, usando WorkManager.
 - Solicitação de PIN ao abrir apps protegidos pela biblioteca ou pela dock do ClarkLaunch.
 - Atualização da lista de aplicativos ao retornar à tela inicial.
 - GitHub Actions para compilar e publicar o APK de debug como artefato.
@@ -41,6 +42,10 @@ Também é possível executar o workflow **Android Build** na aba Actions do Git
 ## Limite importante do App Lock
 
 O App Lock intercepta aberturas iniciadas pela interface do ClarkLaunch. Ele não bloqueia notificações, links externos, configurações do Android, outro launcher ou outras formas de iniciar o aplicativo. Portanto, não deve ser tratado como bloqueio de sistema ou controle parental. Biometria e proteção contra caminhos externos ainda não estão implementadas.
+
+## Limites do Modo Foco
+
+O Modo Foco atual agenda um lembrete ao final do intervalo escolhido. Ele não mede o tempo real em primeiro plano, não interrompe o aplicativo nem impede que o usuário continue usando-o. O lembrete depende de notificações permitidas pelo Android. Monitoramento de uso e bloqueio temporário exigiriam permissões e implementação adicional.
 
 ## Nota sobre visibilidade de aplicativos
 
