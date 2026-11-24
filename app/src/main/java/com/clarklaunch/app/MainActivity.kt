@@ -130,6 +130,8 @@ class MainActivity : ComponentActivity() {
                     initialLockedApps = getSavedLockedApps(),
                     initialHasPin = AppLockSecurity.hasPin(this@MainActivity),
                     initialFocusApps = getSavedFocusApps(),
+                    initialHiddenApps = getSavedHiddenApps(),
+                    onHiddenAppsChanged = ::saveHiddenApps,
                     onFocusAppsChanged = ::saveFocusApps,
                     onStartFocusSession = ::startFocusSession,
                     onSetPin = { AppLockSecurity.setPin(this@MainActivity, it) },
@@ -213,6 +215,15 @@ class MainActivity : ComponentActivity() {
         getSharedPreferences("clarklaunch", MODE_PRIVATE)
             .getStringSet("focus_apps", emptySet())?.toSet() ?: emptySet()
 
+    private fun getSavedHiddenApps(): Set<String> =
+        getSharedPreferences("clarklaunch", MODE_PRIVATE)
+            .getStringSet("hidden_apps", emptySet())?.toSet() ?: emptySet()
+
+    private fun saveHiddenApps(packages: Set<String>) {
+        getSharedPreferences("clarklaunch", MODE_PRIVATE)
+            .edit().putStringSet("hidden_apps", packages).apply()
+    }
+
     private fun saveFocusApps(packages: Set<String>) {
         getSharedPreferences("clarklaunch", MODE_PRIVATE)
             .edit().putStringSet("focus_apps", packages).apply()
@@ -236,6 +247,8 @@ private fun ClarkLaunchHome(
     initialLockedApps: Set<String>,
     initialHasPin: Boolean,
     initialFocusApps: Set<String>,
+    initialHiddenApps: Set<String>,
+    onHiddenAppsChanged: (Set<String>) -> Unit,
     onFocusAppsChanged: (Set<String>) -> Unit,
     onStartFocusSession: (String, String, Int) -> Unit,
     onSetPin: (String) -> Unit,
@@ -258,6 +271,8 @@ private fun ClarkLaunchHome(
     var favoriteLimitMessage by remember { mutableStateOf(false) }
     var lockedApps by remember { mutableStateOf(initialLockedApps) }
     var focusApps by remember { mutableStateOf(initialFocusApps) }
+    var hiddenApps by remember { mutableStateOf(initialHiddenApps) }
+    var showHiddenManager by remember { mutableStateOf(false) }
     var showFocusManager by remember { mutableStateOf(false) }
     var pendingFocusApp by remember { mutableStateOf<LaunchableApp?>(null) }
     var hasPin by remember { mutableStateOf(initialHasPin) }
@@ -321,13 +336,45 @@ private fun ClarkLaunchHome(
         }
     }
 
-    val filteredApps = apps.filter { it.label.contains(search, ignoreCase = true) }
-    val favoriteApps = apps.filter { it.packageName in favorites }.take(5)
+    val visibleApps = apps.filter { it.packageName !in hiddenApps }
+    val filteredApps = visibleApps.filter { it.label.contains(search, ignoreCase = true) }
+    val favoriteApps = visibleApps.filter { it.packageName in favorites }.take(5)
 
     BackHandler(enabled = showAllApps || search.isNotEmpty()) {
         if (showAllApps) showAllApps = false else search = ""
     }
 
+
+    if (showHiddenManager) {
+        AlertDialog(
+            onDismissRequest = { showHiddenManager = false },
+            title = { Text("Aplicativos ocultos", color = Ink) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Ocultar remove o aplicativo da biblioteca e da dock do ClarkLaunch. Ele continua instalado e pode ser aberto pelas configurações do Android ou por outro launcher.", color = SoftInk, fontSize = 12.sp)
+                    LazyColumn(modifier = Modifier.height(330.dp)) {
+                        items(apps, key = { it.packageName }) { app ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Image(bitmap = app.icon.asImageBitmap(), contentDescription = null, modifier = Modifier.size(28.dp))
+                                Text(app.label, color = Ink, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(start = 9.dp))
+                                Checkbox(
+                                    checked = app.packageName in hiddenApps,
+                                    onCheckedChange = { checked ->
+                                        hiddenApps = if (checked) hiddenApps + app.packageName else hiddenApps - app.packageName
+                                        favorites = favorites - app.packageName
+                                        onHiddenAppsChanged(hiddenApps)
+                                        onFavoritesChanged(favorites)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showHiddenManager = false }) { Text("Concluir", color = Blue) } },
+            containerColor = White
+        )
+    }
 
     if (showFocusManager) {
         AlertDialog(
@@ -504,6 +551,14 @@ private fun ClarkLaunchHome(
                         "Dock: até 5 aplicativos favoritos.",
                         color = Blue,
                         fontSize = 12.sp
+                    )
+                    TextButton(onClick = { showSettings = false; showHiddenManager = true }) {
+                        Text("Gerenciar aplicativos ocultos", color = Blue)
+                    }
+                    Text(
+                        "Aplicativos ocultos continuam instalados; apenas deixam de aparecer nesta biblioteca.",
+                        color = SoftInk,
+                        fontSize = 11.sp
                     )
                 }
             },
