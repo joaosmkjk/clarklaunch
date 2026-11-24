@@ -6,7 +6,7 @@ ClarkLaunch is a calm, white-first Android launcher with soft blue accents and a
 
 ## Focus mode
 
-### Current implementation (development 0.9.0)
+### Current implementation (development 0.10.0)
 - User-selected list of distracting apps.
 - Per-launch choice of 5, 10 or 15 minutes.
 - A background WorkManager reminder at the end of the selected interval.
@@ -36,13 +36,13 @@ Research references:
 - Fokus Launcher: clock/date, weather, app search, configurable shortcuts, notes and Pomodoro-oriented tools.
 - Fossify Launcher: familiar grid, folders, widgets and theme controls.
 
-Implemented launcher improvements (0.7.0):
+Implemented launcher improvements (0.7.0–0.10.0):
 - Hide and restore apps from the ClarkLaunch library and favorites dock. Hidden apps remain installed and accessible outside ClarkLaunch.
 - App drawer search matches both visible app labels and package names, ranks label-prefix matches first, then sorts alphabetically.
-- Assign apps to Estudo, Trabalho or Pessoal folders, or leave them without a folder; folder choices persist locally and the library can be filtered by folder.
+- Assign apps to Estudo, Trabalho, Pessoal or user-created folders, or leave them without a folder; folder choices and custom folder names persist locally and can be included in backups.
 
 Remaining planned ClarkLaunch additions, in priority order:
-1. User-defined folder names and richer folder presentation.
+1. Per-app rename and icon overrides.
 2. Per-app rename and icon overrides.
 3. Configurable gestures with conflict-safe defaults.
 4. Home-screen widgets and resizable placement.
