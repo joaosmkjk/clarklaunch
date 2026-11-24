@@ -6,11 +6,12 @@ ClarkLaunch is a calm, white-first Android launcher with soft blue accents and a
 
 ## Focus mode
 
-### Current implementation (development 0.7.0)
+### Current implementation (development 0.8.0)
 - User-selected list of distracting apps.
 - Per-launch choice of 5, 10 or 15 minutes.
 - A background WorkManager reminder at the end of the selected interval.
 - Notification permission request on Android 13+.
+- Optional daily usage overview through UsageStatsManager after the user manually enables Android Usage Access. Results are local and informational; no daily limits or blocking are enforced.
 
 ### Important current limitation
 The timer is a reminder scheduled from the moment the user chooses a duration. It is not foreground-usage accounting: time spent outside the selected app is still counted. It does not suspend or block the target app. Do not describe this as an enforced app limit.
@@ -44,7 +45,7 @@ Remaining planned ClarkLaunch additions, in priority order:
 2. Per-app rename and icon overrides.
 3. Configurable gestures with conflict-safe defaults.
 4. Home-screen widgets and resizable placement.
-5. Backup and restore of launcher preferences.
+5. Backup and restore of launcher preferences. (Implemented in 0.8.0.)
 6. Icon pack support and per-app icon overrides.
 7. Optional widget/search integrations, disabled by default.
 
