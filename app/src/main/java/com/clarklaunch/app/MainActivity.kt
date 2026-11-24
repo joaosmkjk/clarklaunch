@@ -337,7 +337,17 @@ private fun ClarkLaunchHome(
     }
 
     val visibleApps = apps.filter { it.packageName !in hiddenApps }
-    val filteredApps = visibleApps.filter { it.label.contains(search, ignoreCase = true) }
+    val filteredApps = visibleApps
+        .filter {
+            it.label.contains(search.trim(), ignoreCase = true) ||
+                it.packageName.contains(search.trim(), ignoreCase = true)
+        }
+        .sortedWith(
+            compareBy<LaunchableApp> {
+                if (search.isBlank()) 0
+                else if (it.label.startsWith(search.trim(), ignoreCase = true)) 0 else 1
+            }.thenBy { it.label.lowercase(Locale.getDefault()) }
+        )
     val favoriteApps = visibleApps.filter { it.packageName in favorites }.take(5)
 
     BackHandler(enabled = showAllApps || search.isNotEmpty()) {
