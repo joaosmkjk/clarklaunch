@@ -511,6 +511,16 @@ private fun ClarkLaunchHome(
                                 )
                             }
                         }
+                        if (favoriteLimitMessage) {
+                            item {
+                                Text(
+                                    "A dock já tem cinco aplicativos. Remova um favorito para adicionar outro.",
+                                    color = Rose,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
                         if (filteredApps.isEmpty()) {
                             item {
                                 Text("Nenhum aplicativo encontrado.", color = SoftInk, modifier = Modifier.padding(16.dp))
