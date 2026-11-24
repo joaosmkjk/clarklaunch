@@ -37,15 +37,16 @@ Research references:
 Implemented launcher improvements (0.7.0):
 - Hide and restore apps from the ClarkLaunch library and favorites dock. Hidden apps remain installed and accessible outside ClarkLaunch.
 - App drawer search matches both visible app labels and package names, ranks label-prefix matches first, then sorts alphabetically.
+- Assign apps to Estudo, Trabalho or Pessoal folders, or leave them without a folder; folder choices persist locally and the library can be filtered by folder.
 
 Remaining planned ClarkLaunch additions, in priority order:
-1. App folders and user-defined tags.
+1. User-defined folder names and richer folder presentation.
 2. Per-app rename and icon overrides.
-4. Configurable gestures with conflict-safe defaults.
-5. Home-screen widgets and resizable placement.
-6. Backup and restore of launcher preferences.
-7. Icon pack support and per-app icon overrides.
-8. Optional widget/search integrations, disabled by default.
+3. Configurable gestures with conflict-safe defaults.
+4. Home-screen widgets and resizable placement.
+5. Backup and restore of launcher preferences.
+6. Icon pack support and per-app icon overrides.
+7. Optional widget/search integrations, disabled by default.
 
 ## Design and engineering principles
 - Keep the default home screen uncluttered and responsive.
