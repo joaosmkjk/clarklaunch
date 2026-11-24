@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -297,8 +298,8 @@ private fun ClarkLaunchHome(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Crie um PIN de 4 a 8 dígitos. Ele será usado para abrir os aplicativos protegidos dentro do ClarkLaunch.", color = SoftInk, fontSize = 13.sp)
-                    BasicTextField(value = newPin, onValueChange = { if (it.length <= 8 && it.all(Char::isDigit)) newPin = it }, singleLine = true, textStyle = MaterialTheme.typography.titleLarge.copy(color = Ink), decorationBox = { inner -> Box { if (newPin.isEmpty()) Text("Novo PIN", color = SoftInk); inner() } })
-                    BasicTextField(value = confirmPin, onValueChange = { if (it.length <= 8 && it.all(Char::isDigit)) confirmPin = it }, singleLine = true, textStyle = MaterialTheme.typography.titleLarge.copy(color = Ink), decorationBox = { inner -> Box { if (confirmPin.isEmpty()) Text("Confirmar PIN", color = SoftInk); inner() } })
+                    BasicTextField(value = newPin, onValueChange = { if (it.length <= 8 && it.all(Char::isDigit)) newPin = it }, singleLine = true, visualTransformation = PasswordVisualTransformation(), textStyle = MaterialTheme.typography.titleLarge.copy(color = Ink), decorationBox = { inner -> Box { if (newPin.isEmpty()) Text("Novo PIN", color = SoftInk); inner() } })
+                    BasicTextField(value = confirmPin, onValueChange = { if (it.length <= 8 && it.all(Char::isDigit)) confirmPin = it }, singleLine = true, visualTransformation = PasswordVisualTransformation(), textStyle = MaterialTheme.typography.titleLarge.copy(color = Ink), decorationBox = { inner -> Box { if (confirmPin.isEmpty()) Text("Confirmar PIN", color = SoftInk); inner() } })
                     if (pinError.isNotEmpty()) Text(pinError, color = Rose, fontSize = 12.sp)
                 }
             },
@@ -356,7 +357,7 @@ private fun ClarkLaunchHome(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Digite seu PIN para continuar.", color = SoftInk, fontSize = 13.sp)
-                    BasicTextField(value = unlockPin, onValueChange = { if (it.length <= 8 && it.all(Char::isDigit)) unlockPin = it }, singleLine = true, textStyle = MaterialTheme.typography.titleLarge.copy(color = Ink), decorationBox = { inner -> Box { if (unlockPin.isEmpty()) Text("PIN", color = SoftInk); inner() } })
+                    BasicTextField(value = unlockPin, onValueChange = { if (it.length <= 8 && it.all(Char::isDigit)) unlockPin = it }, singleLine = true, visualTransformation = PasswordVisualTransformation(), textStyle = MaterialTheme.typography.titleLarge.copy(color = Ink), decorationBox = { inner -> Box { if (unlockPin.isEmpty()) Text("PIN", color = SoftInk); inner() } })
                     if (unlockError.isNotEmpty()) Text(unlockError, color = Rose, fontSize = 12.sp)
                 }
             },
