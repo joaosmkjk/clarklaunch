@@ -35,11 +35,13 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -116,6 +118,10 @@ class MainActivity : ComponentActivity() {
                     initialFavorites = getSavedFavorites(),
                     initialWallpaper = getSavedWallpaper(),
                     initialWallpaperOpacity = getSavedWallpaperOpacity(),
+                    initialLockedApps = getSavedLockedApps(),
+                    initialHasPin = AppLockSecurity.hasPin(this@MainActivity),
+                    onSetPin = { AppLockSecurity.setPin(this@MainActivity, it) },
+                    onLockedAppsChanged = ::saveLockedApps,
                     onLaunchApp = ::launchApp,
                     onFavoritesChanged = ::saveFavorites,
                     onWallpaperChanged = ::saveWallpaper,
@@ -181,6 +187,15 @@ class MainActivity : ComponentActivity() {
         getSharedPreferences("clarklaunch", MODE_PRIVATE)
             .edit().putString("wallpaper_uri", uri).apply()
     }
+
+    private fun getSavedLockedApps(): Set<String> =
+        getSharedPreferences("clarklaunch", MODE_PRIVATE)
+            .getStringSet("locked_apps", emptySet())?.toSet() ?: emptySet()
+
+    private fun saveLockedApps(packages: Set<String>) {
+        getSharedPreferences("clarklaunch", MODE_PRIVATE)
+            .edit().putStringSet("locked_apps", packages).apply()
+    }
 }
 
 @Composable
@@ -189,6 +204,10 @@ private fun ClarkLaunchHome(
     initialFavorites: Set<String>,
     initialWallpaper: String?,
     initialWallpaperOpacity: Float,
+    initialLockedApps: Set<String>,
+    initialHasPin: Boolean,
+    onSetPin: (String) -> Unit,
+    onLockedAppsChanged: (Set<String>) -> Unit,
     onLaunchApp: (String) -> Unit,
     onFavoritesChanged: (Set<String>) -> Unit,
     onWallpaperChanged: (String) -> Unit,
@@ -202,6 +221,16 @@ private fun ClarkLaunchHome(
     var wallpaperOpacity by remember { mutableStateOf(initialWallpaperOpacity) }
     var showSettings by remember { mutableStateOf(false) }
     var favoriteLimitMessage by remember { mutableStateOf(false) }
+    var lockedApps by remember { mutableStateOf(initialLockedApps) }
+    var hasPin by remember { mutableStateOf(initialHasPin) }
+    var showLockManager by remember { mutableStateOf(false) }
+    var showPinSetup by remember { mutableStateOf(false) }
+    var newPin by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf("") }
+    var pendingLockedPackage by remember { mutableStateOf<String?>(null) }
+    var unlockPin by remember { mutableStateOf("") }
+    var unlockError by remember { mutableStateOf("") }
     var currentTime by remember { mutableStateOf(LocalDateTime.now()) }
 
     LaunchedEffect(Unit) {
@@ -259,6 +288,92 @@ private fun ClarkLaunchHome(
 
     BackHandler(enabled = showAllApps || search.isNotEmpty()) {
         if (showAllApps) showAllApps = false else search = ""
+    }
+
+    if (showPinSetup) {
+        AlertDialog(
+            onDismissRequest = { showPinSetup = false; newPin = ""; confirmPin = ""; pinError = "" },
+            title = { Text("Criar PIN de proteção", color = Ink) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Crie um PIN de 4 a 8 dígitos. Ele será usado para abrir os aplicativos protegidos dentro do ClarkLaunch.", color = SoftInk, fontSize = 13.sp)
+                    BasicTextField(value = newPin, onValueChange = { if (it.length <= 8 && it.all(Char::isDigit)) newPin = it }, singleLine = true, textStyle = MaterialTheme.typography.titleLarge.copy(color = Ink), decorationBox = { inner -> Box { if (newPin.isEmpty()) Text("Novo PIN", color = SoftInk); inner() } })
+                    BasicTextField(value = confirmPin, onValueChange = { if (it.length <= 8 && it.all(Char::isDigit)) confirmPin = it }, singleLine = true, textStyle = MaterialTheme.typography.titleLarge.copy(color = Ink), decorationBox = { inner -> Box { if (confirmPin.isEmpty()) Text("Confirmar PIN", color = SoftInk); inner() } })
+                    if (pinError.isNotEmpty()) Text(pinError, color = Rose, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    when {
+                        newPin.length !in 4..8 -> pinError = "Use entre 4 e 8 dígitos."
+                        newPin != confirmPin -> pinError = "Os PINs não correspondem."
+                        else -> { onSetPin(newPin); hasPin = true; showPinSetup = false; showLockManager = true; newPin = ""; confirmPin = ""; pinError = "" }
+                    }
+                }) { Text("Salvar PIN", color = Blue) }
+            },
+            dismissButton = { TextButton(onClick = { showPinSetup = false }) { Text("Cancelar", color = SoftInk) } },
+            containerColor = White
+        )
+    }
+
+    if (showLockManager) {
+        AlertDialog(
+            onDismissRequest = { showLockManager = false },
+            title = { Text("Aplicativos protegidos", color = Ink) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (hasPin) "Marque os aplicativos que pedirão seu PIN ao serem abertos pelo ClarkLaunch." else "Configure um PIN antes de escolher os aplicativos protegidos.", color = SoftInk, fontSize = 12.sp)
+                    if (hasPin) {
+                        LazyColumn(modifier = Modifier.height(330.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            items(apps, key = { it.packageName }) { app ->
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                    Image(bitmap = app.icon.asImageBitmap(), contentDescription = null, modifier = Modifier.size(28.dp))
+                                    Text(app.label, color = Ink, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(start = 9.dp))
+                                    Checkbox(checked = app.packageName in lockedApps, onCheckedChange = { checked ->
+                                        lockedApps = if (checked) lockedApps + app.packageName else lockedApps - app.packageName
+                                        onLockedAppsChanged(lockedApps)
+                                    })
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { if (hasPin) showLockManager = false else { showLockManager = false; showPinSetup = true } }) {
+                    Text(if (hasPin) "Concluir" else "Criar PIN", color = Blue)
+                }
+            },
+            dismissButton = { TextButton(onClick = { showLockManager = false }) { Text("Fechar", color = SoftInk) } },
+            containerColor = White
+        )
+    }
+
+    if (pendingLockedPackage != null) {
+        AlertDialog(
+            onDismissRequest = { pendingLockedPackage = null; unlockPin = ""; unlockError = "" },
+            title = { Text("Aplicativo protegido", color = Ink) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Digite seu PIN para continuar.", color = SoftInk, fontSize = 13.sp)
+                    BasicTextField(value = unlockPin, onValueChange = { if (it.length <= 8 && it.all(Char::isDigit)) unlockPin = it }, singleLine = true, textStyle = MaterialTheme.typography.titleLarge.copy(color = Ink), decorationBox = { inner -> Box { if (unlockPin.isEmpty()) Text("PIN", color = SoftInk); inner() } })
+                    if (unlockError.isNotEmpty()) Text(unlockError, color = Rose, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (AppLockSecurity.verify(context, unlockPin)) {
+                        val packageToLaunch = pendingLockedPackage
+                        pendingLockedPackage = null
+                        unlockPin = ""
+                        unlockError = ""
+                        if (packageToLaunch != null) onLaunchApp(packageToLaunch)
+                    } else unlockError = "PIN incorreto. Tente novamente."
+                }) { Text("Desbloquear", color = Blue) }
+            },
+            dismissButton = { TextButton(onClick = { pendingLockedPackage = null; unlockPin = ""; unlockError = "" }) { Text("Cancelar", color = SoftInk) } },
+            containerColor = White
+        )
     }
 
     if (showSettings) {
@@ -363,6 +478,15 @@ private fun ClarkLaunchHome(
                         Text("a quieter kind of home", color = SoftInk, fontSize = 10.sp)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(BlueWash, CircleShape)
+                                .clickable { showLockManager = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Outlined.Lock, contentDescription = "Bloqueio de aplicativos", tint = Blue)
+                        }
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
@@ -527,13 +651,19 @@ private fun ClarkLaunchHome(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(White.copy(alpha = 0.96f), RoundedCornerShape(15.dp))
-                                    .clickable { onLaunchApp(app.packageName) }
+                                    .clickable {
+                                        if (app.packageName in lockedApps) pendingLockedPackage = app.packageName
+                                        else onLaunchApp(app.packageName)
+                                    }
                                     .padding(horizontal = 15.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Image(bitmap = app.icon.asImageBitmap(), contentDescription = app.label, modifier = Modifier.size(38.dp))
                                 Spacer(Modifier.size(12.dp))
                                 Text(app.label, color = Ink, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                if (app.packageName in lockedApps) {
+                                    Icon(Icons.Outlined.Lock, contentDescription = "Aplicativo protegido", tint = Blue, modifier = Modifier.padding(end = 8.dp).size(18.dp))
+                                }
                                 Icon(
                                     imageVector = if (app.packageName in favorites) Icons.Outlined.Star else Icons.Outlined.StarBorder,
                                     contentDescription = "Fixar favorito",
@@ -573,7 +703,7 @@ private fun ClarkLaunchHome(
 
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "CLARKLAUNCH  ·  0.3.0",
+                    "CLARKLAUNCH  ·  0.5.0",
                     color = Color(0xFFB5AAB0),
                     fontSize = 9.sp,
                     letterSpacing = 1.5.sp,
