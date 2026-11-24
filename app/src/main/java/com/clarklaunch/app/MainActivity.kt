@@ -609,6 +609,7 @@ private fun ClarkLaunchHome(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(folder, color = Ink, modifier = Modifier.weight(1f), fontSize = 13.sp)
                             TextButton(onClick = {
+                                showFolderManager = false
                                 renamingFolder = folder
                                 renamedFolderName = folder
                             }) { Text("Renomear", color = Blue, fontSize = 11.sp) }
@@ -643,7 +644,7 @@ private fun ClarkLaunchHome(
     if (renamingFolder != null) {
         val oldName = renamingFolder!!
         AlertDialog(
-            onDismissRequest = { renamingFolder = null; renamedFolderName = "" },
+            onDismissRequest = { renamingFolder = null; renamedFolderName = ""; showFolderManager = true },
             title = { Text("Renomear pasta", color = Ink) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -677,10 +678,11 @@ private fun ClarkLaunchHome(
                         if (activeFolder == oldName) activeFolder = newName
                         renamingFolder = null
                         renamedFolderName = ""
+                        showFolderManager = true
                     }
                 }) { Text("Salvar", color = Blue) }
             },
-            dismissButton = { TextButton(onClick = { renamingFolder = null; renamedFolderName = "" }) { Text("Cancelar", color = SoftInk) } },
+            dismissButton = { TextButton(onClick = { renamingFolder = null; renamedFolderName = ""; showFolderManager = true }) { Text("Cancelar", color = SoftInk) } },
             containerColor = White
         )
     }
