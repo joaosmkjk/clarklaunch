@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import org.json.JSONArray
+import org.json.JSONObject
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -94,6 +96,15 @@ private val Blue = Color(0xFF6FA9CE)
 private val BlueWash = Color(0xFFEAF4FA)
 private val Line = Color(0xFFE9EDF1)
 
+private data class LauncherBackup(
+    val favorites: Set<String>,
+    val lockedApps: Set<String>,
+    val focusApps: Set<String>,
+    val hiddenApps: Set<String>,
+    val appFolders: Map<String, String>,
+    val wallpaperOpacity: Float
+)
+
 private data class LaunchableApp(
     val label: String,
     val packageName: String,
@@ -144,7 +155,9 @@ class MainActivity : ComponentActivity() {
                     onLaunchApp = ::launchApp,
                     onFavoritesChanged = ::saveFavorites,
                     onWallpaperChanged = ::saveWallpaper,
-                    onWallpaperOpacityChanged = ::saveWallpaperOpacity
+                    onWallpaperOpacityChanged = ::saveWallpaperOpacity,
+                    onExportBackup = ::exportBackup,
+                    onImportBackup = ::importBackup
                 )
             }
         }
@@ -246,6 +259,62 @@ class MainActivity : ComponentActivity() {
             .edit().putStringSet("focus_apps", packages).apply()
     }
 
+    private fun exportBackup(uri: Uri) {
+        val prefs = getSharedPreferences("clarklaunch", MODE_PRIVATE)
+        val folders = JSONObject()
+        getSavedAppFolders().forEach { (pkg, folder) -> folders.put(pkg, folder) }
+        val backup = JSONObject()
+            .put("format", "clarklaunch-backup")
+            .put("schemaVersion", 1)
+            .put("favorites", JSONArray(getSavedFavorites().toList()))
+            .put("lockedApps", JSONArray(getSavedLockedApps().toList()))
+            .put("focusApps", JSONArray(getSavedFocusApps().toList()))
+            .put("hiddenApps", JSONArray(getSavedHiddenApps().toList()))
+            .put("appFolders", folders)
+            .put("wallpaperOpacity", prefs.getFloat("wallpaper_opacity", 0.34f).toDouble())
+        contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(backup.toString(2)) }
+            ?: throw IllegalStateException("Não foi possível gravar o arquivo.")
+    }
+
+    private fun importBackup(uri: Uri): LauncherBackup {
+        val json = contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { JSONObject(it.readText()) }
+            ?: throw IllegalStateException("Não foi possível ler o arquivo.")
+        require(json.optString("format") == "clarklaunch-backup" && json.optInt("schemaVersion") == 1) {
+            "Este arquivo não é um backup ClarkLaunch compatível."
+        }
+        fun readSet(key: String): Set<String> {
+            val array = json.optJSONArray(key) ?: JSONArray()
+            return buildSet { for (i in 0 until array.length()) array.optString(i).takeIf { it.isNotBlank() }?.let(::add) }
+        }
+        val folderObject = json.optJSONObject("appFolders") ?: JSONObject()
+        val folders = buildMap {
+            val keys = folderObject.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val value = folderObject.optString(key)
+                if (key.isNotBlank() && value in setOf("Estudo", "Trabalho", "Pessoal")) put(key, value)
+            }
+        }
+        val opacity = json.optDouble("wallpaperOpacity", 0.34).toFloat().coerceIn(0.12f, 0.60f)
+        val snapshot = LauncherBackup(
+            favorites = readSet("favorites"),
+            lockedApps = readSet("lockedApps"),
+            focusApps = readSet("focusApps"),
+            hiddenApps = readSet("hiddenApps"),
+            appFolders = folders,
+            wallpaperOpacity = opacity
+        )
+        getSharedPreferences("clarklaunch", MODE_PRIVATE).edit()
+            .putStringSet("favorites", snapshot.favorites)
+            .putStringSet("locked_apps", snapshot.lockedApps)
+            .putStringSet("focus_apps", snapshot.focusApps)
+            .putStringSet("hidden_apps", snapshot.hiddenApps)
+            .putString("app_folders", snapshot.appFolders.entries.joinToString("|") { "${it.key}=${it.value}" })
+            .putFloat("wallpaper_opacity", snapshot.wallpaperOpacity)
+            .apply()
+        return snapshot
+    }
+
     private fun startFocusSession(packageName: String, appLabel: String, minutes: Int) {
         val request = OneTimeWorkRequestBuilder<FocusReminderWorker>()
             .setInitialDelay(minutes.toLong(), TimeUnit.MINUTES)
@@ -275,7 +344,9 @@ private fun ClarkLaunchHome(
     onLaunchApp: (String) -> Unit,
     onFavoritesChanged: (Set<String>) -> Unit,
     onWallpaperChanged: (String) -> Unit,
-    onWallpaperOpacityChanged: (Float) -> Unit
+    onWallpaperOpacityChanged: (Float) -> Unit,
+    onExportBackup: (Uri) -> Unit,
+    onImportBackup: (Uri) -> LauncherBackup
 ) {
     val context = LocalContext.current
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -307,6 +378,7 @@ private fun ClarkLaunchHome(
     var unlockPin by remember { mutableStateOf("") }
     var unlockError by remember { mutableStateOf("") }
     var currentTime by remember { mutableStateOf(LocalDateTime.now()) }
+    var backupMessage by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -319,6 +391,33 @@ private fun ClarkLaunchHome(
     val dateText = currentTime.format(
         DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM", Locale("pt", "BR"))
     ).replaceFirstChar { it.uppercase(Locale("pt", "BR")) }
+
+    val backupExportPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) backupMessage = try {
+            onExportBackup(uri)
+            "Backup salvo com sucesso."
+        } catch (error: Exception) {
+            "Falha ao salvar: ${error.message ?: "erro desconhecido"}"
+        }
+    }
+    val backupImportPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) backupMessage = try {
+            val restored = onImportBackup(uri)
+            favorites = restored.favorites
+            lockedApps = restored.lockedApps
+            focusApps = restored.focusApps
+            hiddenApps = restored.hiddenApps
+            appFolders = restored.appFolders
+            wallpaperOpacity = restored.wallpaperOpacity
+            "Configurações restauradas. O PIN e o papel de parede atual foram preservados."
+        } catch (error: Exception) {
+            "Backup inválido ou inacessível: ${error.message ?: "erro desconhecido"}"
+        }
+    }
 
     val wallpaperPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -618,6 +717,16 @@ private fun ClarkLaunchHome(
                         color = SoftInk,
                         fontSize = 11.sp
                     )
+                    Text("Backup e restauração", color = Ink, fontWeight = FontWeight.Medium)
+                    Text("Exporte favoritos, pastas e preferências para transferir ao trocar de aparelho.", color = SoftInk, fontSize = 11.sp)
+                    TextButton(onClick = { backupMessage = ""; backupExportPicker.launch("ClarkLaunch-backup.json") }) {
+                        Text("Exportar configurações", color = Blue)
+                    }
+                    TextButton(onClick = { backupMessage = ""; backupImportPicker.launch(arrayOf("application/json", "text/json", "*/*")) }) {
+                        Text("Restaurar de um backup", color = Blue)
+                    }
+                    if (backupMessage.isNotBlank()) Text(backupMessage, color = Blue, fontSize = 11.sp)
+                    Text("O PIN nunca é incluído no backup. O papel de parede atual é mantido, pois o arquivo original pode estar em outro aparelho.", color = SoftInk, fontSize = 10.sp)
                 }
             },
             confirmButton = {
