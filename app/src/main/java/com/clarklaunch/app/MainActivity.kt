@@ -1,6 +1,10 @@
 package com.clarklaunch.app
 
 import android.Manifest
+import android.app.AppOpsManager
+import android.app.usage.UsageStatsManager
+import android.content.Context
+import android.provider.Settings
 import android.content.Intent
 import android.os.Build
 import android.content.pm.PackageManager
@@ -83,6 +87,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import java.util.concurrent.TimeUnit
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -157,7 +162,9 @@ class MainActivity : ComponentActivity() {
                     onWallpaperChanged = ::saveWallpaper,
                     onWallpaperOpacityChanged = ::saveWallpaperOpacity,
                     onExportBackup = ::exportBackup,
-                    onImportBackup = ::importBackup
+                    onImportBackup = ::importBackup,
+                    onReadUsageStats = ::readTodayUsageStats,
+                    onOpenUsageAccess = { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
                 )
             }
         }
@@ -315,6 +322,24 @@ class MainActivity : ComponentActivity() {
         return snapshot
     }
 
+    private fun readTodayUsageStats(): List<Pair<String, Long>>? {
+        val appOps = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+        @Suppress("DEPRECATION")
+        val mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), packageName)
+        if (mode != AppOpsManager.MODE_ALLOWED) return null
+        val usageManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val start = java.time.LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val end = System.currentTimeMillis()
+        val labels = loadLaunchableApps().associate { it.packageName to it.label }
+        return usageManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, start, end)
+            .orEmpty()
+            .filter { it.totalTimeInForeground > 0L && it.packageName != packageName }
+            .groupBy { it.packageName }
+            .map { (pkg, entries) -> (labels[pkg] ?: pkg) to entries.sumOf { it.totalTimeInForeground } }
+            .sortedByDescending { it.second }
+            .take(6)
+    }
+
     private fun startFocusSession(packageName: String, appLabel: String, minutes: Int) {
         val request = OneTimeWorkRequestBuilder<FocusReminderWorker>()
             .setInitialDelay(minutes.toLong(), TimeUnit.MINUTES)
@@ -346,7 +371,9 @@ private fun ClarkLaunchHome(
     onWallpaperChanged: (String) -> Unit,
     onWallpaperOpacityChanged: (Float) -> Unit,
     onExportBackup: (Uri) -> Unit,
-    onImportBackup: (Uri) -> LauncherBackup
+    onImportBackup: (Uri) -> LauncherBackup,
+    onReadUsageStats: () -> List<Pair<String, Long>>?,
+    onOpenUsageAccess: () -> Unit
 ) {
     val context = LocalContext.current
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -379,6 +406,9 @@ private fun ClarkLaunchHome(
     var unlockError by remember { mutableStateOf("") }
     var currentTime by remember { mutableStateOf(LocalDateTime.now()) }
     var backupMessage by remember { mutableStateOf("") }
+    var showUsageStats by remember { mutableStateOf(false) }
+    var usageRows by remember { mutableStateOf<List<Pair<String, Long>>?>(null) }
+    var usageChecked by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -684,6 +714,31 @@ private fun ClarkLaunchHome(
         )
     }
 
+    if (showUsageStats) {
+        AlertDialog(
+            onDismissRequest = { showUsageStats = false },
+            title = { Text("Uso de hoje", color = Ink) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("O Android exige que você autorize o acesso ao uso nas configurações do sistema. Os dados são consultados localmente.", color = SoftInk, fontSize = 12.sp)
+                    if (!usageChecked) Text("Toque em Atualizar para consultar os dados.", color = SoftInk, fontSize = 12.sp)
+                    else if (usageRows == null) Text("Acesso ainda não autorizado. Ative o acesso de uso para o ClarkLaunch e volte aqui.", color = Rose, fontSize = 12.sp)
+                    else if (usageRows!!.isEmpty()) Text("Nenhum tempo de uso foi registrado hoje.", color = SoftInk, fontSize = 12.sp)
+                    else usageRows!!.forEach { (label, millis) ->
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(label, color = Ink, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            val minutes = (millis / 60_000L).toInt()
+                            Text(if (minutes >= 60) "${minutes / 60}h ${minutes % 60}min" else "${minutes}min", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { usageRows = onReadUsageStats(); usageChecked = true }) { Text("Atualizar", color = Blue) } },
+            dismissButton = { TextButton(onClick = onOpenUsageAccess) { Text("Permitir acesso", color = Rose) } },
+            containerColor = White
+        )
+    }
+
     if (showSettings) {
         AlertDialog(
             onDismissRequest = { showSettings = false },
@@ -717,6 +772,10 @@ private fun ClarkLaunchHome(
                         color = SoftInk,
                         fontSize = 11.sp
                     )
+                    TextButton(onClick = { usageRows = null; usageChecked = false; showUsageStats = true }) {
+                        Text("Ver uso de aplicativos hoje", color = Blue)
+                    }
+                    Text("As estatísticas usam a permissão especial de Acesso ao uso do Android, ativada somente por você.", color = SoftInk, fontSize = 10.sp)
                     Text("Backup e restauração", color = Ink, fontWeight = FontWeight.Medium)
                     Text("Exporte favoritos, pastas e preferências para transferir ao trocar de aparelho.", color = SoftInk, fontSize = 11.sp)
                     TextButton(onClick = { backupMessage = ""; backupExportPicker.launch("ClarkLaunch-backup.json") }) {
