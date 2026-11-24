@@ -437,6 +437,8 @@ private fun ClarkLaunchHome(
     var appFolders by remember { mutableStateOf(initialAppFolders) }
     var folderNames by remember { mutableStateOf(initialFolderNames) }
     var newFolderName by remember { mutableStateOf("") }
+    var renamingFolder by remember { mutableStateOf<String?>(null) }
+    var renamedFolderName by remember { mutableStateOf("") }
     var showFolderManager by remember { mutableStateOf(false) }
     var selectedFolderApp by remember { mutableStateOf<LaunchableApp?>(null) }
     var activeFolder by remember { mutableStateOf("Todos") }
@@ -607,6 +609,10 @@ private fun ClarkLaunchHome(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(folder, color = Ink, modifier = Modifier.weight(1f), fontSize = 13.sp)
                             TextButton(onClick = {
+                                renamingFolder = folder
+                                renamedFolderName = folder
+                            }) { Text("Renomear", color = Blue, fontSize = 11.sp) }
+                            TextButton(onClick = {
                                 appFolders = appFolders.filterValues { it != folder }
                                 onAppFoldersChanged(appFolders)
                                 folderNames = folderNames - folder
@@ -630,6 +636,51 @@ private fun ClarkLaunchHome(
                 }) { Text("Criar pasta", color = Blue) }
             },
             dismissButton = { TextButton(onClick = { showFolderManager = false; newFolderName = "" }) { Text("Fechar", color = SoftInk) } },
+            containerColor = White
+        )
+    }
+
+    if (renamingFolder != null) {
+        val oldName = renamingFolder!!
+        AlertDialog(
+            onDismissRequest = { renamingFolder = null; renamedFolderName = "" },
+            title = { Text("Renomear pasta", color = Ink) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Os aplicativos organizados nesta pasta serão mantidos nela.", color = SoftInk, fontSize = 12.sp)
+                    BasicTextField(
+                        value = renamedFolderName,
+                        onValueChange = { value ->
+                            if (value.length <= 24 && '|' !in value && '=' !in value) renamedFolderName = value
+                        },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = Ink),
+                        decorationBox = { inner ->
+                            Box(Modifier.fillMaxWidth().background(Canvas, RoundedCornerShape(10.dp)).padding(12.dp)) {
+                                if (renamedFolderName.isEmpty()) Text("Novo nome", color = SoftInk, fontSize = 13.sp)
+                                inner()
+                            }
+                        }
+                    )
+                    Text("Até 24 caracteres. O nome precisa ser único.", color = SoftInk, fontSize = 10.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val newName = renamedFolderName.trim()
+                    val isUnique = folderNames.none { it != oldName && it.equals(newName, ignoreCase = true) }
+                    if (newName.isNotEmpty() && isUnique && '|' !in newName && '=' !in newName) {
+                        folderNames = folderNames.map { if (it == oldName) newName else it }
+                        appFolders = appFolders.mapValues { (_, folder) -> if (folder == oldName) newName else folder }
+                        onFolderNamesChanged(folderNames)
+                        onAppFoldersChanged(appFolders)
+                        if (activeFolder == oldName) activeFolder = newName
+                        renamingFolder = null
+                        renamedFolderName = ""
+                    }
+                }) { Text("Salvar", color = Blue) }
+            },
+            dismissButton = { TextButton(onClick = { renamingFolder = null; renamedFolderName = "" }) { Text("Cancelar", color = SoftInk) } },
             containerColor = White
         )
     }
