@@ -600,7 +600,7 @@ private fun ClarkLaunchHome(
                         ) {
                             favoriteApps.forEach { app ->
                                 Column(
-                                    modifier = Modifier.weight(1f).clickable { onLaunchApp(app.packageName) },
+                                    modifier = Modifier.weight(1f).clickable { if (app.packageName in lockedApps) pendingLockedPackage = app.packageName else onLaunchApp(app.packageName) },
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Image(
