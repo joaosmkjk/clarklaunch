@@ -2,14 +2,15 @@
 
 Um launcher Android independente, construído com Kotlin e Jetpack Compose.
 
-## Estado atual
+## Foundation 0.2.0
 
-**Foundation 0.1.0**
-- Tela inicial com identidade visual escura em tom vinho.
-- Busca e listagem de aplicativos instalados.
-- Abertura de aplicativos diretamente pelo launcher.
+- Identidade visual clara em branco pérola, com detalhes rosa e azul.
+- Ícones reais dos aplicativos instalados.
+- Biblioteca com busca e acesso direto aos aplicativos.
+- Dock de até cinco favoritos, com seleção por estrela e persistência local.
+- Escolha de papel de parede pela galeria, com permissão persistente quando suportada pelo provedor.
 - Registro como opção de aplicativo de início (HOME) do Android.
-- GitHub Actions configurado para compilar o APK de debug.
+- GitHub Actions para compilar e publicar o APK de debug como artefato.
 
 ## Requisitos
 
@@ -18,8 +19,6 @@ Um launcher Android independente, construído com Kotlin e Jetpack Compose.
 - Gradle 8.9
 
 ## Compilar
-
-Na raiz do projeto:
 
 ```bash
 gradle assembleDebug
@@ -32,3 +31,7 @@ Também é possível executar o workflow **Android Build** na aba Actions do Git
 ## Identificador
 
 `com.clarklaunch.app`
+
+## Nota sobre visibilidade de aplicativos
+
+O launcher usa `QUERY_ALL_PACKAGES` para exibir aplicativos instalados. Essa permissão é sujeita a políticas específicas caso o app seja publicado na Google Play; para distribuição direta, avalie as regras aplicáveis ao canal de distribuição.
