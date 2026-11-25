@@ -2,17 +2,17 @@
 
 Um launcher Android independente, construído com Kotlin e Jetpack Compose.
 
-## Development 0.11.0
+## Development 0.12.0
 
 - Identidade visual clara em branco pérola, rosa suave e azul-gelo.
 - Relógio digital e data em português na tela inicial.
-- Ícones reais e biblioteca pesquisável de aplicativos instalados.
+- Ícones reais e biblioteca de aplicativos instalados; a busca fica dentro da biblioteca, mantendo a tela inicial livre de controles extras.
 - Dock com até cinco favoritos, persistidos localmente.
 - Pastas personalizadas para organizar aplicativos, com criação, renomeação e exclusão; categorias padrão preservadas. A renomeação mantém os aplicativos vinculados à pasta.
 - Backup e restauração incluem os nomes das pastas personalizadas.
 - Navegação por gesto horizontal: deslize para a esquerda para abrir a biblioteca e para a direita para voltar.
 - Botão Voltar do Android retorna da biblioteca ou limpa a busca antes de sair.
-- Seleção de papel de parede pela galeria.
+- Seleção de papel de parede pela galeria no atalho de imagem do topo; fundo com maior presença visual.
 - Intensidade do wallpaper persistida entre sessões.
 - Configurações iniciais do launcher.
 - Ação para solicitar ao Android que defina o ClarkLaunch como launcher padrão, usando o seletor oficial de função HOME.
