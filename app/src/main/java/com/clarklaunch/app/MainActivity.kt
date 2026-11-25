@@ -966,7 +966,7 @@ private fun ClarkLaunchHome(
         )
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Canvas) {
         var horizontalDrag by remember { mutableStateOf(0f) }
         Box(
             modifier = Modifier
@@ -978,8 +978,8 @@ private fun ClarkLaunchHome(
                             change.consume()
                         },
                         onDragEnd = {
-                            if (horizontalDrag < -70f) showAllApps = true
-                            if (horizontalDrag > 70f) showAllApps = false
+                            if (horizontalDrag < -90f) showAllApps = true
+                            if (horizontalDrag > 90f) showAllApps = false
                             horizontalDrag = 0f
                         },
                         onDragCancel = { horizontalDrag = 0f }
@@ -991,120 +991,154 @@ private fun ClarkLaunchHome(
                     bitmap = wallpaperBitmap,
                     contentDescription = "Papel de parede",
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize().alpha(1f)
                 )
                 Box(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
                         .background(Canvas.copy(alpha = 1f - wallpaperOpacity))
                 )
-            } else {
-                Box(Modifier.fillMaxSize().background(Canvas))
             }
 
-            if (!showAllApps) {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 25.dp, vertical = 20.dp)
+                    .animateContentSize()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("C L A R K", color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.8.sp)
-                            Spacer(Modifier.height(4.dp))
-                            Text("a quieter kind of home", color = SoftInk, fontSize = 10.sp)
+                    Column {
+                        Text(
+                            "C L A R K",
+                            color = Ink,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.8.sp
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text("a quieter kind of home", color = SoftInk, fontSize = 10.sp)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            modifier = Modifier.size(40.dp).background(BlueWash, CircleShape).clickable { showFocusManager = true },
+                            contentAlignment = Alignment.Center
+                        ) { Icon(Icons.Outlined.Timer, contentDescription = "Modo Foco", tint = Blue) }
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(BlueWash, CircleShape)
+                                .clickable { showLockManager = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Outlined.Lock, contentDescription = "Bloqueio de aplicativos", tint = Blue)
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(Modifier.size(40.dp).background(BlueWash, CircleShape).clickable { showFocusManager = true }, contentAlignment = Alignment.Center) {
-                                Icon(Icons.Outlined.Timer, contentDescription = "Modo Foco", tint = Blue)
-                            }
-                            Box(Modifier.size(40.dp).background(BlueWash, CircleShape).clickable { showLockManager = true }, contentAlignment = Alignment.Center) {
-                                Icon(Icons.Outlined.Lock, contentDescription = "Bloqueio de aplicativos", tint = Blue)
-                            }
-                            Box(Modifier.size(40.dp).background(BlueWash, CircleShape).clickable { wallpaperPicker.launch(arrayOf("image/*")) }, contentAlignment = Alignment.Center) {
-                                Icon(Icons.Outlined.Image, contentDescription = "Escolher wallpaper", tint = Blue)
-                            }
-                            Box(Modifier.size(40.dp).background(RoseWash, CircleShape).clickable { showSettings = true }, contentAlignment = Alignment.Center) {
-                                Icon(Icons.Outlined.Settings, contentDescription = "Configurações", tint = Rose)
-                            }
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(BlueWash, CircleShape)
+                                .clickable { wallpaperPicker.launch(arrayOf("image/*")) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Outlined.Image, contentDescription = "Escolher wallpaper", tint = Blue)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(RoseWash, CircleShape)
+                                .clickable { showSettings = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Outlined.Settings, contentDescription = "Configurações", tint = Rose)
                         }
                     }
+                }
 
-                    Spacer(Modifier.height(30.dp))
-                    Text(timeText, color = Ink, fontSize = 58.sp, fontWeight = FontWeight.Light, letterSpacing = (-2).sp)
-                    Text(dateText, color = SoftInk, fontSize = 12.sp)
+                Spacer(Modifier.height(30.dp))
 
-                    Spacer(Modifier.weight(1f))
+                Text(timeText, color = Ink, fontSize = 58.sp, fontWeight = FontWeight.Light, letterSpacing = (-2).sp)
+                Text(dateText, color = SoftInk, fontSize = 12.sp)
+                // Keep the wallpaper and clock area open; anchor the favorites dock at the bottom.
+                Spacer(Modifier.weight(1f))
 
-                    if (favoriteLimitMessage) {
-                        Text("A dock já tem cinco aplicativos.", color = Rose, fontSize = 11.sp, modifier = Modifier.padding(bottom = 8.dp))
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .background(White.copy(alpha = 0.78f), RoundedCornerShape(24.dp))
-                            .padding(horizontal = 8.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (favoriteApps.isEmpty()) {
-                            Text(
-                                "Deslize para ver seus aplicativos",
-                                color = SoftInk,
-                                fontSize = 12.sp,
-                                modifier = Modifier.clickable { showAllApps = true }.padding(vertical = 10.dp)
-                            )
-                        } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (showAllApps) "BIBLIOTECA" else "SEUS FAVORITOS",
+                        color = SoftInk,
+                        fontSize = 10.sp,
+                        letterSpacing = 2.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        if (showAllApps) "VOLTAR" else "VER TODOS",
+                        color = Blue,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.clickable {
+                            showAllApps = !showAllApps
+                            if (!showAllApps) search = ""
+                        }
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                if (!showAllApps) {
+                    if (favoriteApps.isEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(White.copy(alpha = 0.94f), RoundedCornerShape(20.dp))
+                                .clickable { showAllApps = true }
+                                .padding(18.dp)
+                        ) {
+                            Text("Sua dock começa aqui", color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(5.dp))
+                            Text("Abra a biblioteca e toque na estrela para fixar até cinco favoritos.", color = SoftInk, fontSize = 12.sp)
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(White.copy(alpha = 0.94f), RoundedCornerShape(22.dp))
+                                .padding(vertical = 15.dp, horizontal = 7.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             favoriteApps.forEach { app ->
                                 Column(
-                                    modifier = Modifier.weight(1f).clickable {
-                                        if (app.packageName in lockedApps) pendingLockedPackage = app.packageName
-                                        else if (app.packageName in focusApps) pendingFocusApp = app
-                                        else onLaunchApp(app.packageName)
-                                    },
+                                    modifier = Modifier.weight(1f).clickable { if (app.packageName in lockedApps) pendingLockedPackage = app.packageName else if (app.packageName in focusApps) pendingFocusApp = app else onLaunchApp(app.packageName) },
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Image(bitmap = app.icon.asImageBitmap(), contentDescription = app.label, modifier = Modifier.size(42.dp))
-                                    Spacer(Modifier.height(5.dp))
+                                    Image(
+                                        bitmap = app.icon.asImageBitmap(),
+                                        contentDescription = app.label,
+                                        modifier = Modifier.size(39.dp)
+                                    )
+                                    Spacer(Modifier.height(6.dp))
                                     Text(app.label, color = Ink, fontSize = 9.sp, maxLines = 1)
                                 }
                             }
                         }
                     }
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { showAllApps = true }.padding(vertical = 5.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("‹", color = Blue, fontSize = 16.sp)
-                        Spacer(Modifier.width(8.dp))
-                        Text("DESLIZE PARA A BIBLIOTECA", color = SoftInk, fontSize = 9.sp, letterSpacing = 1.5.sp)
-                        Spacer(Modifier.width(8.dp))
-                        Text("›", color = Blue, fontSize = 16.sp)
+
+                    if (favoriteLimitMessage) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("A dock já tem cinco aplicativos. Remova um favorito para adicionar outro.", color = Rose, fontSize = 11.sp)
                     }
-                }
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 12.dp)
-                ) {
+
+                } else {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "‹  INÍCIO",
-                            color = Blue,
-                            fontSize = 11.sp,
-                            letterSpacing = 1.sp,
-                            modifier = Modifier.clickable { showAllApps = false; search = "" }
-                        )
-                        Text("APLICATIVOS", color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth().background(White.copy(alpha = 0.88f), RoundedCornerShape(15.dp))
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(White.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
                             .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1118,57 +1152,59 @@ private fun ClarkLaunchHome(
                             textStyle = MaterialTheme.typography.bodyMedium.copy(color = Ink),
                             decorationBox = { inner ->
                                 Box {
-                                    if (search.isEmpty()) Text("Pesquisar aplicativos", color = SoftInk, fontSize = 13.sp)
+                                    if (search.isEmpty()) Text("Pesquisar na biblioteca", color = SoftInk, fontSize = 13.sp)
                                     inner()
                                 }
                             }
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
                     ) {
                         (listOf("Todos") + folderNames + "Sem pasta").forEach { folder ->
                             TextButton(
                                 onClick = { activeFolder = folder },
-                                modifier = Modifier.background(if (activeFolder == folder) BlueWash else White.copy(alpha = 0.82f), RoundedCornerShape(14.dp))
+                                modifier = Modifier.background(if (activeFolder == folder) BlueWash else White, RoundedCornerShape(14.dp))
                             ) {
                                 Text(folder, color = if (activeFolder == folder) Blue else SoftInk, fontSize = 11.sp)
                             }
                         }
                     }
                     TextButton(onClick = { showFolderManager = true }) {
-                        Text("+ Pastas", color = Rose, fontSize = 12.sp)
+                        Text("+ Gerenciar pastas", color = Rose, fontSize = 12.sp)
                     }
+                    Spacer(Modifier.height(8.dp))
                     LazyColumn(
                         modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(bottom = 18.dp),
-                        verticalArrangement = Arrangement.spacedBy(7.dp)
+                        contentPadding = PaddingValues(bottom = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(filteredApps, key = { it.packageName }) { app ->
                             Row(
-                                modifier = Modifier.fillMaxWidth()
-                                    .background(White.copy(alpha = 0.91f), RoundedCornerShape(15.dp))
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(White.copy(alpha = 0.96f), RoundedCornerShape(15.dp))
                                     .clickable {
                                         if (app.packageName in lockedApps) pendingLockedPackage = app.packageName
                                         else if (app.packageName in focusApps) pendingFocusApp = app
                                         else onLaunchApp(app.packageName)
                                     }
-                                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                                    .padding(horizontal = 15.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Image(bitmap = app.icon.asImageBitmap(), contentDescription = app.label, modifier = Modifier.size(36.dp))
-                                Spacer(Modifier.size(11.dp))
+                                Image(bitmap = app.icon.asImageBitmap(), contentDescription = app.label, modifier = Modifier.size(38.dp))
+                                Spacer(Modifier.size(12.dp))
                                 Text(app.label, color = Ink, fontSize = 14.sp, modifier = Modifier.weight(1f))
                                 if (app.packageName in lockedApps) {
-                                    Icon(Icons.Outlined.Lock, contentDescription = "Aplicativo protegido", tint = Blue, modifier = Modifier.padding(end = 7.dp).size(17.dp))
+                                    Icon(Icons.Outlined.Lock, contentDescription = "Aplicativo protegido", tint = Blue, modifier = Modifier.padding(end = 8.dp).size(18.dp))
                                 }
                                 Icon(
                                     imageVector = Icons.Outlined.Folder,
                                     contentDescription = "Organizar em pasta",
                                     tint = if (app.packageName in appFolders) Blue else SoftInk,
-                                    modifier = Modifier.size(22.dp).clickable { selectedFolderApp = app }.padding(end = 5.dp)
+                                    modifier = Modifier.size(22.dp).clickable { selectedFolderApp = app }.padding(end = 6.dp)
                                 )
                                 Icon(
                                     imageVector = if (app.packageName in favorites) Icons.Outlined.Star else Icons.Outlined.StarBorder,
@@ -1176,19 +1212,45 @@ private fun ClarkLaunchHome(
                                     tint = if (app.packageName in favorites) Blue else SoftInk,
                                     modifier = Modifier.size(24.dp).clickable {
                                         favoriteLimitMessage = false
-                                        favorites = if (app.packageName in favorites) favorites - app.packageName
-                                        else if (favorites.size < 5) favorites + app.packageName
-                                        else { favoriteLimitMessage = true; favorites }
+                                        favorites = if (app.packageName in favorites) {
+                                            favorites - app.packageName
+                                        } else if (favorites.size < 5) {
+                                            favorites + app.packageName
+                                        } else {
+                                            favoriteLimitMessage = true
+                                            favorites
+                                        }
                                         onFavoritesChanged(favorites)
                                     }
                                 )
                             }
                         }
+                        if (favoriteLimitMessage) {
+                            item {
+                                Text(
+                                    "A dock já tem cinco aplicativos. Remova um favorito para adicionar outro.",
+                                    color = Rose,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
                         if (filteredApps.isEmpty()) {
-                            item { Text("Nenhum aplicativo encontrado.", color = SoftInk, modifier = Modifier.padding(16.dp)) }
+                            item {
+                                Text("Nenhum aplicativo encontrado.", color = SoftInk, modifier = Modifier.padding(16.dp))
+                            }
                         }
                     }
                 }
+
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "CLARKLAUNCH  ·  0.12.0",
+                    color = Color(0xFFB5AAB0),
+                    fontSize = 9.sp,
+                    letterSpacing = 1.5.sp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
             }
         }
     }
