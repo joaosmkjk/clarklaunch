@@ -217,7 +217,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun getSavedWallpaperOpacity(): Float =
-        getSharedPreferences("clarklaunch", MODE_PRIVATE).getFloat("wallpaper_opacity", 0.34f)
+        getSharedPreferences("clarklaunch", MODE_PRIVATE).getFloat("wallpaper_opacity", 0.78f)
 
     private fun saveWallpaperOpacity(value: Float) {
         getSharedPreferences("clarklaunch", MODE_PRIVATE)
@@ -297,7 +297,7 @@ class MainActivity : ComponentActivity() {
             .put("hiddenApps", JSONArray(getSavedHiddenApps().toList()))
             .put("appFolders", folders)
             .put("folderNames", JSONArray(getSavedFolderNames()))
-            .put("wallpaperOpacity", prefs.getFloat("wallpaper_opacity", 0.34f).toDouble())
+            .put("wallpaperOpacity", prefs.getFloat("wallpaper_opacity", 0.78f).toDouble())
         contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(backup.toString(2)) }
             ?: throw IllegalStateException("Não foi possível gravar o arquivo.")
     }
@@ -331,7 +331,7 @@ class MainActivity : ComponentActivity() {
                 if (key.isNotBlank() && value in restoredFolderNames) put(key, value)
             }
         }
-        val opacity = json.optDouble("wallpaperOpacity", 0.34).toFloat().coerceIn(0.12f, 0.60f)
+        val opacity = json.optDouble("wallpaperOpacity", 0.78).toFloat().coerceIn(0.15f, 0.95f)
         val snapshot = LauncherBackup(
             favorites = readSet("favorites"),
             lockedApps = readSet("lockedApps"),
@@ -912,7 +912,7 @@ private fun ClarkLaunchHome(
                             wallpaperOpacity = it
                             onWallpaperOpacityChanged(it)
                         },
-                        valueRange = 0.12f..0.60f
+                        valueRange = 0.15f..0.95f
                     )
                     Text(
                         "Ajuste entre um fundo discreto e uma imagem mais presente.",
@@ -991,12 +991,12 @@ private fun ClarkLaunchHome(
                     bitmap = wallpaperBitmap,
                     contentDescription = "Papel de parede",
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().alpha(wallpaperOpacity)
+                    modifier = Modifier.fillMaxSize().alpha(1f)
                 )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Canvas.copy(alpha = 1f - wallpaperOpacity * 0.42f))
+                        .background(Canvas.copy(alpha = 1f - wallpaperOpacity))
                 )
             }
 
@@ -1063,41 +1063,8 @@ private fun ClarkLaunchHome(
                 Text(dateText, color = SoftInk, fontSize = 12.sp)
                 Spacer(Modifier.height(24.dp))
 
-                Text("Leveza em", color = Ink, fontSize = 31.sp, fontWeight = FontWeight.Light, letterSpacing = (-1).sp)
-                Text("cada detalhe.", color = Rose, fontSize = 31.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1).sp)
-                Spacer(Modifier.height(8.dp))
-                Text("Seu mundo, em harmonia.", color = SoftInk, fontSize = 13.sp)
-
+                // Keep the home screen intentionally quiet: apps remain searchable inside the library.
                 Spacer(Modifier.height(22.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(White.copy(alpha = 0.94f), RoundedCornerShape(18.dp))
-                        .padding(horizontal = 16.dp, vertical = 15.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Outlined.Search, contentDescription = null, tint = Blue)
-                    Spacer(Modifier.size(11.dp))
-                    BasicTextField(
-                        value = search,
-                        onValueChange = {
-                            search = it
-                            if (it.isNotBlank()) showAllApps = true
-                        },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = Ink),
-                        decorationBox = { innerTextField ->
-                            Box {
-                                if (search.isEmpty()) Text("Buscar um aplicativo", color = SoftInk, fontSize = 13.sp)
-                                innerTextField()
-                            }
-                        }
-                    )
-                }
-
-                Spacer(Modifier.height(20.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1169,27 +1136,31 @@ private fun ClarkLaunchHome(
                         Text("A dock já tem cinco aplicativos. Remova um favorito para adicionar outro.", color = Rose, fontSize = 11.sp)
                     }
 
-                    Spacer(Modifier.height(15.dp))
+                } else {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(BlueWash.copy(alpha = 0.92f), RoundedCornerShape(18.dp))
-                            .clickable { wallpaperPicker.launch(arrayOf("image/*")) }
-                            .padding(15.dp),
+                            .background(White.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Outlined.Image, contentDescription = null, tint = Blue)
-                        Spacer(Modifier.size(12.dp))
-                        Column {
-                            Text("Seu cenário", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Escolha uma imagem da galeria", color = SoftInk, fontSize = 11.sp)
-                        }
+                        Icon(Icons.Outlined.Search, contentDescription = null, tint = Blue)
+                        Spacer(Modifier.size(10.dp))
+                        BasicTextField(
+                            value = search,
+                            onValueChange = { search = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = Ink),
+                            decorationBox = { inner ->
+                                Box {
+                                    if (search.isEmpty()) Text("Pesquisar na biblioteca", color = SoftInk, fontSize = 13.sp)
+                                    inner()
+                                }
+                            }
+                        )
                     }
-                    Spacer(Modifier.height(14.dp))
-                    Box(Modifier.fillMaxWidth().height(1.dp).background(Line))
-                    Spacer(Modifier.height(12.dp))
-                    Text("UM LUGAR PARA RESPIRAR", color = Color(0xFFB5AAB0), fontSize = 9.sp, letterSpacing = 1.8.sp)
-                } else {
+                    Spacer(Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(7.dp)
