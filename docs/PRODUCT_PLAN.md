@@ -6,7 +6,7 @@ ClarkLaunch is a calm, white-first Android launcher with soft blue accents and a
 
 ## Focus mode
 
-### Current implementation (development 0.11.0)
+### Current implementation (development 0.12.0)
 - User-selected list of distracting apps.
 - Per-launch choice of 5, 10 or 15 minutes.
 - A background WorkManager reminder at the end of the selected interval.
